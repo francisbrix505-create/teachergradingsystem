@@ -1,0 +1,2677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher's Gradebook — School Grading System</title>
+<meta name="description" content="A real school gradebook: item-based assessments, quarter grades, final grades, report cards, class averages and a teacher sign-in.">
+<meta name="theme-color" content="#103f3a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%20%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23103f3a%22%2F%3E%20%20%3Crect%20x%3D%2213%22%20y%3D%2212%22%20width%3D%2238%22%20height%3D%2240%22%20rx%3D%225%22%20fill%3D%22%23ffffff%22%2F%3E%20%20%3Cpath%20d%3D%22M20%2023h24M20%2031h24M20%2039h14%22%20stroke%3D%22%23103f3a%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%2F%3E%20%20%3Ccircle%20cx%3D%2245%22%20cy%3D%2241%22%20r%3D%229%22%20fill%3D%22%236d5ce7%22%2F%3E%20%20%3Cpath%20d%3D%22m41%2041%203%203%205-6%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+/* ==========================================================================
+   Teacher's Gradebook — clean, spreadsheet-inspired light theme
+   Pure CSS, embedded into index.html by build.py. No external resources.
+
+   Structure (in this order, each layer refines the one before it):
+     1. design tokens, base elements, buttons, top bar
+     2. gradebook sheet + tables, list tables, modals, toasts, responsive
+     3. subject landing cards and click-to-edit student names
+     4. item-based class record, assessments, report card, settings
+     5. full-height page-scrolling tables and layout polish
+     6. random grades, seed note, keyboard helpers, one print block
+   Every layer is labelled below; all print rules live in the single final
+   print block so paper output is deterministic.
+   ========================================================================== */
+:root{
+  --bg:#f3f6fb; --card:#ffffff; --ink:#131b2e; --muted:#6c7891; --faint:#9aa5ba;
+  --line:#e2e8f2; --line-strong:#cdd7e8;
+  --accent:#6d5ce7; --accent-dark:#5444cc; --accent-soft:#f1eeff;
+  --head:#103f3a; --head-2:#17564d;
+  --green:#128465; --green-soft:#e6f6ef;
+  --red:#d24b63; --red-soft:#fff0f2;
+  --amber:#c8891c;
+  --shadow:0 12px 34px rgba(19,32,60,.07);
+  --radius:18px; --container:1420px; color-scheme:light;
+  --sticky-top:112px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+::selection{background:#d9d2ff}
+a{color:inherit}
+button,input,select{font:inherit}
+button{cursor:pointer}
+svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+.container{width:min(100% - 40px,var(--container));margin-inline:auto}
+.muted{color:var(--muted)}
+
+/* top bar + page nav */
+.topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.bar-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;height:64px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--head);color:#fff;flex:none}
+.brand-mark svg{width:20px;height:20px}
+.brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.brand-text strong{font-size:.98rem;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-text small{color:var(--muted);font-size:.76rem}
+.bar-right{display:flex;align-items:center;gap:14px}
+.save-status{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.save-status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
+.save-status.error .dot{background:var(--red)}
+.save-status.error{color:var(--red)}
+.nav-tabs{border-top:1px solid var(--line);background:#fff}
+.nav-inner{display:flex;gap:4px}
+.nav-tab{display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);font-size:.88rem;font-weight:650;transition:.18s}
+.nav-tab svg{width:17px;height:17px}
+.nav-tab:hover{color:var(--accent);background:#faf9ff}
+.nav-tab.active{color:var(--accent-dark);border-bottom-color:var(--accent)}
+@media(max-width:600px){.nav-tab{padding:11px 10px;font-size:.8rem}.nav-tab svg{width:15px;height:15px}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:10px;
+  padding:10px 16px;font-size:.86rem;font-weight:650;transition:transform .16s,box-shadow .16s,background .16s,border-color .16s;white-space:nowrap}
+.btn svg{width:16px;height:16px}
+.btn:hover{transform:translateY(-1px)}
+.btn-sm{padding:8px 13px;font-size:.82rem}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(109,92,231,.25)}
+.btn-primary:hover{background:var(--accent-dark);box-shadow:0 8px 22px rgba(109,92,231,.35)}
+.btn-ghost{background:#fff;border-color:var(--line-strong);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger-ghost{background:#fff;border-color:#f0c7cf;color:var(--red)}
+.btn-danger-ghost:hover{background:var(--red-soft);border-color:var(--red)}
+.btn-danger{background:var(--red);color:#fff}
+.icon-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+.icon-btn:hover{color:var(--red);border-color:var(--red)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* page head + pickers */
+.page-head{padding:24px 0 18px}
+.page-head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.kicker{display:inline-block;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:750;margin-bottom:10px}
+.page-head h1{font-size:clamp(1.7rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.15;margin:0 0 10px;font-weight:800}
+.page-head p{margin:0;color:var(--muted);max-width:820px;font-size:.94rem}
+.page-head p strong{color:var(--accent-dark)}
+.storage-warning{display:flex;align-items:center;gap:10px;padding:12px 16px;margin:18px 0 0;border-radius:12px;background:var(--red-soft);border:1px solid #f3c3cc;color:#a32f47;font-size:.86rem}
+.storage-warning svg{width:18px;height:18px}
+.picker{display:grid;gap:10px;margin-bottom:18px}
+.picker-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.picker-label{display:inline-flex;align-items:center;gap:8px;min-width:110px;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;font-weight:750;color:var(--muted)}
+.picker-label svg{width:16px;height:16px;color:var(--accent)}
+.tabs{display:flex;flex-wrap:wrap;gap:7px;flex:1}
+.tab{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;border:1px solid var(--line-strong);background:#fbfcff;color:var(--ink);font-size:.84rem;font-weight:650;transition:.16s}
+.tab:hover{border-color:var(--accent);color:var(--accent)}
+.tab.active{background:var(--head);border-color:var(--head);color:#fff}
+.tab-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:100px;background:rgba(109,92,231,.12);color:var(--accent-dark);font-size:.7rem;font-weight:800}
+.tab.active .tab-count{background:rgba(255,255,255,.2);color:#fff}
+.picker select{height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line-strong);background:#fbfcff;color:var(--ink);font-size:.85rem;outline:none}
+.picker-note{font-size:.8rem;color:var(--muted)}
+.picker-note strong{color:var(--ink)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
+.stat-label{display:flex;align-items:center;gap:8px;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.stat-label svg{width:15px;height:15px;color:var(--accent)}
+.stat-value{font-size:1.75rem;font-weight:800;letter-spacing:-.035em;margin-top:8px;line-height:1.1}
+.stat-sub{font-size:.76rem;color:var(--faint);margin-top:4px}
+
+/* sheet */
+/* No overflow clipping here: the table must be able to use the page scroll and
+   keep its header sticky against the viewport. */
+.sheet{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:visible;margin-bottom:18px}
+.sheet>:first-child{border-top-left-radius:var(--radius);border-top-right-radius:var(--radius)}
+.sheet>:last-child{border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius)}
+.sheet-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.search-box{display:flex;align-items:center;gap:9px;height:38px;padding:0 12px;border:1px solid var(--line-strong);border-radius:10px;background:#fbfcff;color:var(--muted);min-width:260px;flex:1;max-width:380px}
+.search-box svg{width:16px;height:16px}
+.search-box input{border:0;outline:none;background:none;color:var(--ink);width:100%;font-size:.86rem}
+.search-box input::placeholder{color:var(--faint)}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,92,231,.12)}
+.toolbar-actions{display:flex;flex-wrap:wrap;gap:8px}
+.student-count{font-size:.84rem;color:var(--muted)}
+.panel-head{display:flex;align-items:center;gap:9px;padding:15px 18px;border-bottom:1px solid var(--line);font-size:.92rem;font-weight:750}
+.panel-head svg{width:18px;height:18px;color:var(--accent)}
+.panel-head small{margin-left:auto;font-weight:400;color:var(--faint);font-size:.78rem;text-align:right}
+
+/* grade table */
+.table-scroll{position:relative}
+.grade-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px;font-size:.86rem;font-variant-numeric:tabular-nums}
+.grade-table th,.grade-table td{padding:8px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap}
+.grade-table th:first-child,.grade-table td:first-child{border-left:1px solid var(--line)}
+.grade-table th:last-child,.grade-table td:last-child{border-right:0}
+.grade-table thead th{position:sticky;top:var(--sticky-top);z-index:6;background:var(--head);color:#fff;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:750;border-bottom:0;border-right:1px solid rgba(255,255,255,.14);height:50px;vertical-align:bottom}
+.grade-table .col-id{width:96px;min-width:96px;left:0}
+.grade-table .col-name{width:186px;min-width:186px;left:96px}
+.grade-table .col-sec{width:86px;min-width:86px;left:282px}
+.grade-table .sticky{position:sticky;z-index:2;background:#fff}
+.grade-table thead th.sticky{z-index:8;background:var(--head-2)}
+.grade-table tbody tr:nth-child(even) td{background:#fafbfe}
+.grade-table tbody tr:nth-child(even) td.sticky{background:#fafbfe}
+.grade-table tbody tr:hover td{background:#f4f1ff}
+.grade-table tbody tr:hover td.sticky{background:#f4f1ff}
+.grade-table tbody td.col-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.79rem;color:var(--muted);font-weight:600}
+.grade-table tbody td.col-name{font-weight:650;color:var(--ink)}
+.grade-table tbody td.col-sec{color:var(--muted);font-size:.78rem}
+.grade-table .sticky.col-sec{box-shadow:6px 0 10px -8px rgba(19,32,60,.35)}
+.grade-table thead th.sticky.col-sec{box-shadow:6px 0 10px -8px rgba(0,0,0,.5)}
+.grade-table .score-col{min-width:88px}
+.grade-table .result-col{min-width:132px}
+.cell{width:100%;min-width:76px;max-width:100px;padding:7px 6px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);text-align:center;font-size:.87rem;font-variant-numeric:tabular-nums;outline:none;transition:.15s}
+.cell::placeholder{color:#c3cbdd}
+.cell:hover{border-color:#b9a9f5}
+.cell:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,92,231,.15)}
+.cell.invalid{border-color:var(--red);background:var(--red-soft);color:var(--red)}
+.dash{color:var(--faint)}
+.partial{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle}
+.remark{display:inline-block;padding:4px 10px;border-radius:100px;font-size:.74rem;font-weight:700}
+.remark.pass{background:var(--green-soft);color:var(--green)}
+.remark.fail{background:var(--red-soft);color:var(--red)}
+.row-actions{display:flex;gap:6px}
+.row-actions button{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted)}
+.row-actions button:hover{color:var(--accent);border-color:var(--accent)}
+.row-actions button.del:hover{color:var(--red);border-color:var(--red)}
+.row-actions svg{width:15px;height:15px}
+.grade-table tfoot td{position:relative;background:#eef1f9;font-weight:750;font-size:.82rem;color:#3a4560;border-top:2px solid var(--line-strong);font-variant-numeric:tabular-nums}
+.empty-row td{text-align:center;padding:40px 16px;color:var(--muted)}
+.sheet-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-top:1px solid var(--line);font-size:.82rem;color:var(--muted)}
+.sheet-foot strong{color:var(--ink)}
+.progress{display:inline-block;width:110px;height:7px;border-radius:100px;background:#e8ecf5;overflow:hidden;vertical-align:middle;margin-left:8px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#9a8cff);border-radius:100px;transition:width .3s}
+.legend{font-size:.76rem;color:var(--faint)}
+.how-note{display:flex;align-items:flex-start;gap:9px;margin:14px 0 0;font-size:.82rem;color:var(--muted)}
+.how-note svg{width:17px;height:17px;color:var(--accent);margin-top:1px}
+
+/* simple list tables (students, matrix, ranking) */
+.list-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;font-size:.87rem}
+.list-table th,.list-table td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.list-table thead th{background:var(--head);color:#fff;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:750;position:sticky;top:var(--sticky-top);z-index:6}
+.list-table tbody tr:nth-child(even){background:#fafbfe}
+.list-table tbody tr:hover{background:#f4f1ff}
+.list-table td.num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent-dark)}
+.list-table td.name{font-weight:650}
+.list-table td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;color:var(--muted)}
+.list-table .actions-col{text-align:right}
+.rank{display:inline-grid;place-items:center;min-width:28px;height:26px;padding:0 6px;border-radius:8px;background:var(--accent-soft);color:var(--accent-dark);font-weight:800;font-size:.78rem}
+.rank.top{background:var(--green-soft);color:var(--green)}
+
+/* avg page */
+.avg-grid{display:grid;grid-template-columns:1.45fr 1fr;gap:18px}
+.dist-wrap{padding:22px 20px;display:grid;gap:14px}
+.dist-item{display:grid;grid-template-columns:28px 1fr 52px;gap:10px;align-items:center;font-size:.84rem}
+.dist-letter{font-weight:800;color:var(--accent-dark)}
+.dist-track{height:12px;border-radius:100px;background:#eef1f8;overflow:hidden}
+.dist-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent),#9a8cff);transition:width .35s}
+.dist-count{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.dist-empty{color:var(--faint);font-size:.86rem;text-align:center;padding:24px}
+
+/* footer */
+.site-footer{margin-top:30px;border-top:1px solid var(--line);background:#fff}
+.footer-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:20px 0;color:var(--muted);font-size:.82rem}
+
+/* modals */
+.modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(12,20,36,.55);backdrop-filter:blur(4px)}
+.modal{width:min(100%,460px);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(12,20,36,.28)}
+.modal-wide{width:min(100%,620px)}
+.modal-small{width:min(100%,400px);padding:28px;text-align:center}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;border-bottom:1px solid var(--line)}
+.modal-head h3{margin:0;font-size:1.15rem}
+.modal-body{padding:20px 24px}
+.modal-hint{margin:0 0 16px;font-size:.84rem;color:var(--muted)}
+.form-field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+.form-field>span{font-size:.8rem;font-weight:650;color:var(--muted)}
+.form-field>span em{color:var(--red);font-style:normal}
+.form-field input{width:100%;padding:11px 13px;border:1px solid var(--line-strong);border-radius:10px;background:#fbfcff;color:var(--ink);outline:none;font-size:.9rem}
+.form-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,92,231,.12)}
+.form-field input::placeholder{color:var(--faint)}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--line);background:#fafbff}
+.modal-small .modal-actions{justify-content:center;border:0;background:none;padding:20px 0 0}
+.confirm-icon{width:52px;height:52px;border-radius:16px;margin:0 auto 14px;display:grid;place-items:center;background:var(--red-soft);color:var(--red)}
+.confirm-icon svg{width:24px;height:24px}
+.modal-small h3{margin:0 0 8px;font-size:1.15rem}
+.modal-small p{margin:0;font-size:.88rem}
+.subject-list{display:grid;gap:9px;margin-bottom:16px}
+.subject-row{display:grid;grid-template-columns:24px 1fr 34px;gap:9px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:11px;background:#fbfcff}
+.subject-row .idx{font-size:.75rem;font-weight:800;color:var(--accent)}
+.subject-row input{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:.86rem;outline:none}
+.subject-row input:focus{border-color:var(--accent)}
+.add-subject-row{display:flex;gap:9px;padding-top:14px;border-top:1px solid var(--line)}
+.add-subject-row input{flex:1;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;background:#fbfcff;color:var(--ink);font-size:.87rem;outline:none}
+.add-subject-row input:focus{border-color:var(--accent)}
+
+/* toasts */
+.toast-stack{position:fixed;right:20px;bottom:20px;z-index:200;display:grid;gap:10px;max-width:min(360px,calc(100vw - 40px))}
+.toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:#18233c;color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 14px 34px rgba(12,20,36,.3);font-size:.85rem;animation:slidein .22s ease}
+.toast.error{background:#8e2439}
+@keyframes slidein{from{transform:translateX(18px);opacity:0}to{transform:none;opacity:1}}
+
+/* responsive */
+@media(max-width:1100px){.avg-grid{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .container{width:min(100% - 24px,var(--container))}
+  .bar-inner{height:auto;min-height:60px;flex-wrap:wrap;padding:9px 0;gap:8px}
+  .save-status{font-size:.74rem}
+  .stats{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat{padding:14px}.stat-value{font-size:1.4rem}
+  .sheet-toolbar{padding:12px}
+  .search-box{max-width:none;width:100%;flex:1 1 100%}
+  .toolbar-actions{width:100%}.toolbar-actions .btn{flex:1}
+  .picker-row{padding:10px}
+  .picker-label{min-width:100%}
+  .tabs{flex:1 1 100%}
+  .sheet-foot{flex-direction:column;align-items:flex-start}
+  .panel-head small{display:none}
+  .how-note{font-size:.78rem}
+}
+@media(max-width:460px){
+  .btn-sm{padding:8px 10px;font-size:.78rem}
+  .brand-text small{display:none}
+  .nav-tab{gap:5px}
+  .modal-body,.modal-head,.modal-actions{padding-left:16px;padding-right:16px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
+
+/* ==========================================================================
+   3. Sign-in, subject landing cards, quick edit
+   ========================================================================== */
+.btn-block{width:100%;padding:12px 16px}
+.link-btn{border:0;background:none;padding:0;color:var(--accent);font-size:.82rem;font-weight:650;text-decoration:underline;text-underline-offset:3px}
+.link-btn:hover{color:var(--accent-dark)}
+.auth-error{padding:10px 12px;margin:0 0 12px;border-radius:9px;background:var(--red-soft);border:1px solid #f3c3cc;color:#a32f47;font-size:.83rem}
+
+.auth-view{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr;background:#fff}
+.auth-panel{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:26px;padding:40px 28px}
+.auth-brand{display:flex;align-items:center;gap:12px}
+.auth-brand>span:last-child{display:flex;flex-direction:column;line-height:1.25}
+.auth-brand strong{font-size:1rem}
+.auth-brand small{color:var(--muted);font-size:.76rem}
+.auth-card{width:min(100%,420px);padding:32px;border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 50px rgba(19,32,60,.09);background:#fff}
+.auth-card h1{margin:0 0 8px;font-size:1.8rem;letter-spacing:-.035em}
+.auth-sub{margin:0 0 22px;color:var(--muted);font-size:.88rem}
+.auth-card .form-field{margin-bottom:14px}
+.auth-foot{margin-top:16px;text-align:center}
+.auth-note{display:flex;align-items:flex-start;gap:8px;max-width:420px;margin:0;color:var(--faint);font-size:.76rem;text-align:left}
+.auth-note svg{width:15px;height:15px;margin-top:2px;flex:none}
+.auth-aside{position:relative;background:radial-gradient(circle at 20% 15%,#2c6e63 0%,transparent 55%),linear-gradient(145deg,#103f3a,#0c2b39 70%);color:#fff;display:grid;place-items:center;padding:48px;overflow:hidden}
+.auth-aside::after{content:"";position:absolute;width:420px;height:420px;border:1px solid rgba(255,255,255,.13);border-radius:50%;right:-150px;bottom:-160px;box-shadow:0 0 0 60px rgba(255,255,255,.035),0 0 0 130px rgba(255,255,255,.025)}
+.aside-inner{position:relative;z-index:1;max-width:430px}
+.aside-tag{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:#9fe6d2;font-weight:750}
+.aside-inner h2{font-size:clamp(2rem,3.4vw,3rem);line-height:1.12;letter-spacing:-.04em;margin:18px 0 16px}
+.aside-inner p{color:#c7e5dd;font-size:.94rem;margin:0 0 28px}
+.aside-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px}
+.aside-chips span{padding:7px 13px;border-radius:100px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);font-size:.8rem;font-weight:600}
+.aside-quarters{display:flex;align-items:center;gap:8px}
+.aside-quarters span{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:rgba(255,255,255,.13);font-weight:800;font-size:.85rem}
+.aside-quarters small{margin-left:8px;letter-spacing:.16em;font-size:.68rem;color:#9fe6d2}
+@media(max-width:900px){.auth-view{grid-template-columns:1fr}.auth-aside{display:none}}
+
+.teacher-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:100px;background:var(--green-soft);color:var(--green);font-size:.8rem;font-weight:700;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.teacher-chip svg{width:15px;height:15px}
+.head-actions{display:flex;flex-wrap:wrap;gap:9px}
+.back-link{display:inline-flex;align-items:center;gap:7px;padding:0;margin:0 0 14px;border:0;background:none;color:var(--accent);font-size:.84rem;font-weight:700}
+.back-link svg{width:16px;height:16px}
+.back-link:hover{text-decoration:underline;text-underline-offset:4px}
+
+/* subject landing cards */
+.subject-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px;margin-top:4px}
+.subject-card{position:relative;display:flex;flex-direction:column;gap:14px;padding:22px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transition:transform .18s,box-shadow .18s,border-color .18s}
+.subject-card:hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(19,32,60,.12);border-color:#c9c0ff}
+.sc-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sc-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--head);color:#fff}
+.sc-icon svg{width:21px;height:21px}
+.sc-badge{padding:5px 10px;border-radius:100px;background:var(--accent-soft);color:var(--accent-dark);font-size:.72rem;font-weight:750}
+.subject-card h3{margin:0;font-size:1.14rem;letter-spacing:-.02em;line-height:1.3}
+.sc-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sc-metrics>div{display:flex;flex-direction:column;gap:2px}
+.sc-metrics small{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:700}
+.sc-metrics strong{font-size:1.25rem;font-weight:800;letter-spacing:-.03em;color:var(--ink);font-variant-numeric:tabular-nums}
+.sc-actions{display:flex;align-items:center;gap:8px;margin-top:auto}
+.sc-actions .btn{flex:1}
+.add-card{align-items:center;justify-content:center;min-height:230px;border:2px dashed var(--line-strong);background:#fbfcff;box-shadow:none;text-align:center}
+.add-card:hover{border-color:var(--accent)}
+.add-card .add-plus{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:4px}
+.add-card .add-plus svg{width:26px;height:26px}
+.add-card h3{color:var(--accent-dark)}
+.add-card p{margin:0;color:var(--muted);font-size:.82rem}
+.add-card button{border:0;background:none;padding:0;color:inherit;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer}
+
+/* click-to-edit student name */
+.name-edit{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:2px 4px;margin:-2px -4px;border:0;border-radius:7px;background:none;color:var(--ink);font-weight:650;font-size:inherit;text-align:left}
+.name-edit svg{width:13px;height:13px;color:var(--faint);opacity:0;transition:opacity .15s}
+.name-edit:hover{background:var(--accent-soft);color:var(--accent-dark)}
+.name-edit:hover svg,.name-edit:focus-visible svg{opacity:1}
+.modal-quick{width:min(100%,420px)}
+
+/* ==========================================================================
+   4. Item-based class record, assessment setup, report card, settings
+   ========================================================================== */
+.nav-inner{overflow-x:auto;scrollbar-width:none}
+.nav-inner::-webkit-scrollbar{display:none}
+.nav-tab{flex:none}
+
+/* grade pills (works for college 1.00–5.00 and letters A–F) */
+.grade-pill{display:inline-flex;align-items:center;justify-content:center;min-width:44px;padding:4px 9px;border-radius:8px;font-weight:800;font-size:.8rem;font-variant-numeric:tabular-nums}
+.grade-good{background:var(--green-soft);color:var(--green)}
+.grade-mid{background:#fff4de;color:var(--amber)}
+.grade-bad{background:var(--red-soft);color:var(--red)}
+
+/* class record header + score cells */
+.grade-table thead th{height:auto;padding:9px 10px;vertical-align:bottom;text-transform:none;letter-spacing:0}
+.grade-table thead th.score-col{min-width:88px}
+.th-name{display:block;font-size:.78rem;font-weight:750;color:#fff;text-transform:none;letter-spacing:0;line-height:1.25}
+.th-items{display:block;font-size:.72rem;color:#a9ddd0;margin-top:3px;font-weight:600}
+.th-cat{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:100px;background:rgba(255,255,255,.16);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;font-weight:750;color:#fff}
+.grade-table thead th[data-comp="quiz"]{border-top:3px solid #7dd3fc}
+.grade-table thead th[data-comp="assignment"]{border-top:3px solid #c4b5fd}
+.grade-table thead th[data-comp="project"]{border-top:3px solid #fcd34d}
+.grade-table thead th[data-comp="recitation"]{border-top:3px solid #fdba74}
+.grade-table thead th[data-comp="exam"]{border-top:3px solid #86efac}
+.cell-wrap{display:flex;align-items:center;gap:3px;justify-content:center}
+.cell{width:52px;min-width:48px;max-width:none;padding:7px 4px}
+.cell-max{font-size:.72rem;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* item summary strip */
+.item-strip{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:16px}
+.item-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:11px;background:#fff;font-size:.8rem;box-shadow:var(--shadow)}
+.item-chip b{font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent-dark)}
+.item-chip .swatch{width:9px;height:9px;border-radius:3px;flex:none}
+.item-chip.total{background:var(--head);border-color:var(--head);color:#fff}
+.item-chip.total b{color:#fff}
+
+/* formula explainer */
+.formula-panel{margin-bottom:16px;border:1px solid var(--line);border-radius:14px;background:#faf9ff;overflow:hidden}
+.formula-panel summary{display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;list-style:none;font-size:.88rem;color:var(--accent-dark)}
+.formula-panel summary::-webkit-details-marker{display:none}
+.formula-panel summary svg{width:17px;height:17px}
+.formula-panel summary::after{content:"+";margin-left:auto;font-size:1.2rem;color:var(--accent)}
+.formula-panel[open] summary::after{content:"−"}
+#formulaChip{margin-left:auto;margin-right:8px;padding:3px 10px;border-radius:100px;background:#fff;border:1px solid #ddd6ff;font-size:.72rem;font-weight:700}
+.formula-body{padding:4px 18px 18px}
+.formula-body p{margin:0 0 12px;font-size:.87rem;color:var(--muted)}
+.formula-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px}
+.formula-step{padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;font-size:.8rem}
+.formula-step small{display:block;color:var(--faint);text-transform:uppercase;letter-spacing:.07em;font-weight:700;font-size:.68rem;margin-bottom:4px}
+.formula-step b{font-size:1rem;font-weight:800;color:var(--accent-dark);font-variant-numeric:tabular-nums}
+.formula-step span{color:var(--muted)}
+
+/* assessment setup */
+.add-assess-form{display:flex;flex-wrap:wrap;gap:9px;padding:16px 18px;border-bottom:1px solid var(--line);background:#fbfcff}
+.add-assess-form select,.add-assess-form input{height:38px;padding:0 11px;border:1px solid var(--line-strong);border-radius:9px;background:#fff;color:var(--ink);font-size:.85rem;outline:none}
+.add-assess-form select{min-width:150px}
+.add-assess-form input[type=text]{flex:1;min-width:190px}
+.add-assess-form input[type=number]{width:100px}
+.add-assess-form select:focus,.add-assess-form input:focus{border-color:var(--accent)}
+.list-table td.items-cell{font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent-dark)}
+.list-table td .tag{display:inline-block;padding:3px 9px;border-radius:100px;background:var(--accent-soft);color:var(--accent-dark);font-size:.72rem;font-weight:700}
+.weights-row{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:10px;align-items:end;padding:14px;margin:0 0 16px;border:1px solid var(--line);border-radius:12px;background:#fbfcff}
+.weights-row label{display:flex;flex-direction:column;gap:5px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.weights-row input{width:100%;padding:9px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;outline:none;text-align:center;font-size:.9rem}
+.weights-total{font-size:.82rem;font-weight:750;color:var(--green);white-space:nowrap;padding-bottom:9px}
+.weights-total.bad{color:var(--red)}
+.settings-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.setting-desc{margin:-6px 0 16px;font-size:.82rem;color:var(--muted);line-height:1.5}
+.form-field select{width:100%;padding:11px 13px;border:1px solid var(--line-strong);border-radius:10px;background:#fbfcff;color:var(--ink);outline:none;font-size:.9rem}
+
+/* report card */
+.report-sheet{padding:26px 28px 30px}
+.report-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:20px;margin-bottom:18px;border-bottom:2px solid var(--head)}
+.report-head h2{margin:0 0 4px;font-size:1.5rem;letter-spacing:-.03em}
+.report-head p{margin:0;color:var(--muted);font-size:.86rem}
+.report-general{min-width:190px;padding:14px 18px;border-radius:14px;background:var(--head);color:#fff;text-align:center}
+.report-general small{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:#a9ddd0;font-weight:700}
+.report-general strong{display:block;font-size:1.9rem;font-weight:800;letter-spacing:-.04em;line-height:1.2}
+.report-general span{font-size:.78rem;color:#c7e5dd}
+.report-sheet .list-table{min-width:720px}
+.report-sheet .list-table tfoot td{background:#eef1f9;font-weight:800;border-top:2px solid var(--line-strong)}
+
+@media(max-width:760px){
+  .report-sheet{padding:16px}
+  .settings-two{grid-template-columns:1fr}
+  .weights-row{grid-template-columns:1fr 1fr}
+  .add-assess-form input[type=text]{min-width:100%}
+}
+
+/* ==========================================================================
+   5. Full-height page-scrolling tables, layout polish
+   ========================================================================== */
+/* Only clip horizontally when the viewport really is too narrow. On wide
+   screens there is no scroll container, so column headers stick to the
+   viewport while the whole page scrolls through all 40 students. */
+@media(max-width:1220px){
+  .table-scroll{overflow-x:auto}
+  /* Inside a horizontal scroll box the header cannot stick to the viewport.
+     Keep the pinned ID/Name/Section columns and let the header scroll here. */
+  .grade-table thead th:not(.sticky),.list-table thead th{position:static;box-shadow:none}
+}
+/* --sticky-top is measured from the real top bar at runtime (see app.js), so a
+   wrapped mobile top bar never covers the sticky table header. */
+
+.grade-table thead th{box-shadow:0 7px 14px -10px rgba(0,0,0,.6)}
+.table-scroll:last-child tbody tr:last-child td:first-child{border-bottom-left-radius:var(--radius)}
+.table-scroll:last-child tbody tr:last-child td:last-child{border-bottom-right-radius:var(--radius)}
+
+/* row numbers and one clear result cell */
+.row-num{display:inline-block;min-width:22px;margin-right:7px;color:var(--faint);font-size:.7rem;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.result-cell{text-align:center;background:var(--accent-soft)!important;min-width:132px}
+.result-main{display:block;font-size:1.04rem;font-weight:800;color:var(--accent-dark);font-variant-numeric:tabular-nums;line-height:1.2}
+.result-sub{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:5px}
+.result-meta{display:block;margin-top:4px;font-size:.7rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.grade-table tfoot td.result-cell{background:#e5e0ff!important}
+
+/* subtle category tint so long rows stay readable */
+.grade-table tbody td[data-comp="quiz"]{box-shadow:inset 2px 0 0 rgba(125,211,252,.6)}
+.grade-table tbody td[data-comp="assignment"]{box-shadow:inset 2px 0 0 rgba(196,181,253,.6)}
+.grade-table tbody td[data-comp="project"]{box-shadow:inset 2px 0 0 rgba(252,211,77,.6)}
+.grade-table tbody td[data-comp="recitation"]{box-shadow:inset 2px 0 0 rgba(253,186,116,.6)}
+.grade-table tbody td[data-comp="exam"]{box-shadow:inset 2px 0 0 rgba(134,239,172,.65)}
+
+/* breadcrumb + compact top-bar buttons */
+.breadcrumb{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;font-size:.76rem;color:var(--faint);font-weight:600}
+.breadcrumb b{color:var(--ink)}
+.breadcrumb .sep{opacity:.55}
+@media(max-width:1100px){ .btn-label{display:none} .bar-right .btn-sm{padding:8px 10px} }
+
+/* record bar */
+.item-strip{padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow)}
+.item-strip::before{content:"CLASS RECORD";display:block;width:100%;font-size:.68rem;letter-spacing:.14em;font-weight:800;color:var(--faint);margin-bottom:2px}
+.item-chip{padding:6px 10px;box-shadow:none}
+.item-chip.total{padding:6px 12px}
+
+/* scroll hint for narrow screens */
+.scroll-hint{display:none;padding:9px 16px;border-top:1px solid var(--line);font-size:.76rem;color:var(--muted);background:#fafbff}
+@media(max-width:1220px){ .scroll-hint{display:block} }
+
+/* back to top */
+.to-top{position:fixed;right:22px;bottom:22px;z-index:80;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);background:var(--head);color:#fff;box-shadow:0 10px 26px rgba(16,63,58,.35);transition:transform .2s,opacity .2s}
+.to-top:hover{transform:translateY(-3px)}
+.to-top svg{width:19px;height:19px}
+
+.sheet-toolbar{position:relative;background:#fff;border-top-left-radius:var(--radius);border-top-right-radius:var(--radius)}
+.sheet-foot{border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius)}
+.grade-table tbody tr:last-child td{border-bottom:0}
+
+/* One print block: everything that should not appear on paper, at the very end
+   so it always wins over the screen rules above. */
+@media print{
+  body{background:#fff}
+  .topbar,.auth-view,.picker,.sheet-toolbar,.sheet-foot,.how-note,.site-footer,.toast-stack,
+  .modal-backdrop,.storage-warning,.to-top,.scroll-hint,.item-strip,.formula-panel,.breadcrumb,
+  .head-actions,.back-link,.nav-tabs,.teacher-chip,.seed-note,.skip-link{display:none!important}
+  .page-head{padding:0 0 12px}
+  .page-head h1{font-size:1.4rem}
+  .page-head p{font-size:.8rem}
+  .sheet,.report-sheet{border:0;box-shadow:none;border-radius:0}
+  .table-scroll{overflow:visible;max-height:none}
+  .grade-table,.list-table{min-width:0;font-size:.7rem}
+  .grade-table th,.grade-table td,.list-table th,.list-table td{padding:5px 6px}
+  .grade-table thead th,.list-table thead th,.grade-table .sticky,.grade-table tfoot td{position:static;box-shadow:none}
+  .cell{border:0;background:transparent!important;min-width:0;max-width:none;padding:2px}
+  .row-actions,.stats{display:none}
+  @page{size:landscape;margin:10mm}
+}
+
+/* ==========================================================================
+   6. Random grades, seed note, keyboard helpers, print
+   ========================================================================== */
+/* random grade filler */
+.rand-preview{padding:11px 13px;margin:2px 0 0;border-radius:10px;background:var(--accent-soft);color:var(--accent-dark);font-size:.84rem;font-weight:650;line-height:1.45}
+.rand-preview.warn{background:var(--red-soft);color:#a32f47}
+.how-note strong{color:var(--accent-dark)}
+.rand-shortcut{display:flex;align-items:center;gap:7px;width:100%;margin:0 0 14px;padding:9px 12px;border:1px dashed var(--accent);border-radius:9px;background:var(--accent-soft);color:var(--accent-dark);font-size:.82rem;font-weight:700;cursor:pointer;text-align:left}
+.rand-shortcut:hover{background:#dbeafe}
+.rand-shortcut svg{width:14px;height:14px;flex:none}
+.seed-note{display:flex;align-items:center;gap:10px;margin:0 0 20px;padding:12px 15px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;background:var(--accent-soft);color:var(--accent-dark);font-size:.86rem;line-height:1.5}
+.seed-note svg{width:16px;height:16px;flex:none}
+
+/* keyboard navigation + visually hidden helper */
+.skip-link{position:fixed;left:-9999px;top:0;z-index:300;padding:10px 16px;border-radius:0 0 10px 0;background:var(--head);color:#fff;font-size:.85rem;font-weight:700;text-decoration:none}
+.skip-link:focus{left:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+</style>
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10M15 10v10"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM17 11a3 3 0 1 0-1-5.8M21 20v-2a4 4 0 0 0-3-3.9"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21H10v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 16.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7.5 4l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.8 2.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1H21v4h-.2a1.7 1.7 0 0 0-1.4 1Z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8.2 8 9 4.6-.8 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h9a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4Z"/><path d="M20 4h-1a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h1Z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h4M8 17h7"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8Z"/></symbol>
+</svg>
+
+<!-- ================= SIGN IN ================= -->
+<div class="auth-view" id="authView">
+  <div class="auth-panel">
+    <div class="auth-brand"><span class="brand-mark"><svg><use href="#i-table"/></svg></span><span><strong>Teacher's Gradebook</strong><small>Item-based grading · 4 quarters</small></span></div>
+    <div class="auth-card">
+      <span class="kicker" id="authKicker">WELCOME</span>
+      <h1 id="authTitle">Sign in</h1>
+      <p class="auth-sub" id="authSub">Enter your teacher username and password to open your subjects.</p>
+      <form id="authForm" novalidate>
+        <label class="form-field" id="authNameField" hidden><span>Teacher's name <em>*</em></span><input id="authName" type="text" maxlength="80" placeholder="e.g. Maria Santos" autocomplete="name"></label>
+        <label class="form-field"><span>Username <em>*</em></span><input id="authUser" type="text" maxlength="60" placeholder="Your username" autocomplete="username"></label>
+        <label class="form-field"><span>Password <em>*</em></span><input id="authPass" type="password" maxlength="120" placeholder="Your password" autocomplete="current-password"></label>
+        <label class="form-field" id="authConfirmField" hidden><span>Confirm password <em>*</em></span><input id="authConfirm" type="password" maxlength="120" placeholder="Type it again" autocomplete="new-password"></label>
+        <p class="auth-error" id="authError" hidden></p>
+        <button class="btn btn-primary btn-block" id="authSubmit" type="submit"><svg><use href="#i-lock"/></svg> <span id="authSubmitLabel">Sign in</span></button>
+      </form>
+      <div class="auth-foot"><button class="link-btn" type="button" id="authResetBtn">Forgot password? Reset the teacher account</button></div>
+    </div>
+    <p class="auth-note"><svg><use href="#i-info"/></svg> This sign-in is local to this browser. Resetting the account keeps your grades.</p>
+  </div>
+  <div class="auth-aside" aria-hidden="true">
+    <div class="aside-inner">
+      <span class="aside-tag">SCHOOL GRADING SYSTEM</span>
+      <h2>Raw scores.<br>Total items.<br>Real grades.</h2>
+      <p>Record scores over the number of items, get category and quarter grades, then print a report card for every student.</p>
+      <div class="aside-chips"><span>Quiz 17/20</span><span>Project 40/50</span><span>Exam 42/50</span></div>
+      <div class="aside-quarters"><span>1st</span><span>2nd</span><span>3rd</span><span>4th</span><small>QUARTER</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APPLICATION ================= -->
+<div id="appShell" hidden>
+  <a class="skip-link" href="#mainContent">Skip to main content</a>
+  <header class="topbar">
+    <div class="container bar-inner">
+      <div class="brand"><span class="brand-mark"><svg><use href="#i-table"/></svg></span>
+        <span class="brand-text"><strong>Teacher's Gradebook</strong><small>Item-based grading · 4 quarters</small></span></div>
+      <div class="bar-right">
+        <span class="save-status" id="saveStatus"><i class="dot"></i> Ready</span>
+        <button class="btn btn-ghost btn-sm" id="settingsBtn" type="button" aria-label="Grading settings"><svg><use href="#i-settings"/></svg><span class="btn-label">Grading settings</span></button>
+        <button class="btn btn-ghost btn-sm" id="printBtn" type="button" aria-label="Print"><svg><use href="#i-print"/></svg><span class="btn-label">Print</span></button>
+        <span class="teacher-chip" id="teacherChip"><svg><use href="#i-users"/></svg> <span id="teacherName"></span></span>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button" aria-label="Log out"><svg><use href="#i-logout"/></svg><span class="btn-label">Log out</span></button>
+      </div>
+    </div>
+    <nav class="nav-tabs" aria-label="Pages">
+      <div class="container nav-inner">
+        <button class="nav-tab active" type="button" data-view="subjects"><svg><use href="#i-book"/></svg> Subjects</button>
+        <button class="nav-tab" type="button" data-view="gradebook"><svg><use href="#i-table"/></svg> Gradebook</button>
+        <button class="nav-tab" type="button" data-view="assessments"><svg><use href="#i-list"/></svg> Assessments</button>
+        <button class="nav-tab" type="button" data-view="students"><svg><use href="#i-users"/></svg> Students</button>
+        <button class="nav-tab" type="button" data-view="report"><svg><use href="#i-card"/></svg> Report Card</button>
+        <button class="nav-tab" type="button" data-view="average"><svg><use href="#i-chart"/></svg> Class Average</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container" id="mainContent">
+    <h2 class="sr-only">Gradebook views</h2>
+    <div class="storage-warning" id="storageWarning" hidden><svg><use href="#i-info"/></svg> This browser blocked local storage. Your entries will still work, but they will disappear when the tab is closed. Use a normal browser window to keep them.</div>
+
+    <!-- ============ SUBJECTS ============ -->
+    <section class="view" id="viewSubjects">
+      <div class="page-head page-head-row">
+        <div><span class="kicker">YOUR SUBJECTS</span><h1>Welcome, <span id="teacherGreet"></span></h1>
+          <p>Select a subject to open its grade dashboard. Add, rename or delete subjects here.</p></div>
+        <div class="head-actions">
+          <button class="btn btn-ghost" id="landingManageBtn" type="button"><svg><use href="#i-settings"/></svg> Manage subjects</button>
+          <button class="btn btn-primary" id="landingAddBtn" type="button"><svg><use href="#i-plus"/></svg> Add subject</button>
+        </div>
+      </div>
+      <section class="stats" id="landingStats" aria-label="Overview"></section>
+      <div class="seed-note" id="seedNote" hidden><svg><use href="#i-spark"/></svg><span id="seedNoteText"></span></div>
+      <div class="subject-cards" id="subjectCards"></div>
+    </section>
+
+    <!-- ============ GRADEBOOK ============ -->
+    <section class="view" id="viewGradebook" hidden>
+      <div class="page-head page-head-row">
+        <div>
+          <div class="breadcrumb" id="breadcrumb"></div>
+          <button class="back-link" id="backToSubjects" type="button"><svg><use href="#i-back"/></svg> All subjects</button>
+          <span class="kicker">CLASS RECORD · <span id="currentSubjectLabel"></span></span>
+          <h1>Enter scores</h1>
+          <p>Type each student's <strong>raw score</strong>. The number of items is shown on every column and beside each box. Blank cells are skipped. Click a student's name to edit it.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-primary" id="randomBtnTop" type="button"><svg><use href="#i-spark"/></svg> Random grades for all students</button>
+        </div>
+      </div>
+
+      <div class="picker">
+        <div class="picker-row"><span class="picker-label"><svg><use href="#i-book"/></svg> Subject</span><div class="tabs" id="subjectTabs"></div>
+          <button class="btn btn-ghost btn-sm" id="manageSubjectsBtn" type="button"><svg><use href="#i-settings"/></svg> Manage subjects</button></div>
+        <div class="picker-row"><span class="picker-label"><svg><use href="#i-table"/></svg> Quarter</span><div class="tabs" id="quarterTabs"></div>
+          <button class="btn btn-ghost btn-sm" id="goAssessmentsBtn" type="button"><svg><use href="#i-list"/></svg> Edit assessments</button></div>
+      </div>
+
+      <details class="formula-panel" id="formulaPanel">
+        <summary><svg><use href="#i-info"/></svg> <strong>How the quarter grade is computed</strong> <span id="formulaChip"></span></summary>
+        <div class="formula-body">
+          <p id="formulaExplain"></p>
+          <div class="formula-steps" id="formulaSteps"></div>
+        </div>
+      </details>
+
+      <div class="item-strip" id="itemStrip"></div>
+
+      <section class="sheet">
+        <div class="sheet-toolbar">
+          <label class="search-box"><svg><use href="#i-search"/></svg><input type="search" id="searchInput" placeholder="Search name or student ID…" aria-label="Search students" autocomplete="off"></label>
+          <div class="toolbar-actions">
+            <button class="btn btn-primary btn-sm" id="addStudentBtn" type="button"><svg><use href="#i-plus"/></svg> Add student</button>
+            <button class="btn btn-ghost btn-sm" id="exportBtn" type="button"><svg><use href="#i-download"/></svg> Export CSV</button>
+            <button class="btn btn-ghost btn-sm" id="randomBtn" type="button"><svg><use href="#i-spark"/></svg> Random grades</button>
+            <button class="btn btn-danger-ghost btn-sm" id="clearBtn" type="button"><svg><use href="#i-trash"/></svg> Clear scores</button>
+          </div>
+        </div>
+        <div class="table-scroll"><table class="grade-table"><thead id="tableHead"></thead><tbody id="tableBody"></tbody><tfoot id="tableFoot"></tfoot></table></div>
+        <div class="scroll-hint">↔ Swipe sideways to see every assessment column. The student ID, name and section stay visible.</div>
+        <div class="sheet-foot"><span id="sheetInfo"></span><span class="legend" id="scaleLegend"></span></div>
+      </section>
+      <p class="how-note"><svg><use href="#i-info"/></svg> Enter / ↓ / ↑ move between cells in the same column. A dot on the quarter grade means some assessments are still blank. <strong>Random grades</strong> fills practice data — every cell stays editable.</p>
+    </section>
+
+    <!-- ============ ASSESSMENTS ============ -->
+    <section class="view" id="viewAssessments" hidden>
+      <div class="page-head page-head-row">
+        <div><span class="kicker">ASSESSMENT SETUP</span><h1>Assessments &amp; items</h1>
+          <p>Define how many items every quiz, assignment, project, recitation and exam is worth — for each subject and each quarter.</p></div>
+        <button class="btn btn-ghost" id="copyQuarterBtn" type="button"><svg><use href="#i-copy"/></svg> Copy this quarter to all 4</button>
+      </div>
+      <div class="picker">
+        <div class="picker-row">
+          <span class="picker-label"><svg><use href="#i-book"/></svg> Subject</span>
+          <select id="assessSubject" aria-label="Assessment subject"></select>
+          <span class="picker-label"><svg><use href="#i-table"/></svg> Quarter</span>
+          <select id="assessQuarter" aria-label="Assessment quarter">
+            <option value="q1">1st Quarter</option><option value="q2">2nd Quarter</option>
+            <option value="q3">3rd Quarter</option><option value="q4">4th Quarter</option>
+          </select>
+        </div>
+      </div>
+      <section class="stats" id="assessStats" aria-label="Assessment totals"></section>
+
+      <section class="sheet">
+        <div class="panel-head"><svg><use href="#i-plus"/></svg> Add an assessment <small>score out of a number of items</small></div>
+        <form class="add-assess-form" id="addAssessmentForm" novalidate>
+          <select id="newAssessComp" aria-label="Category"></select>
+          <input id="newAssessName" type="text" maxlength="60" placeholder="Assessment name, e.g. Quiz 3" aria-label="Assessment name">
+          <input id="newAssessItems" type="number" min="1" max="1000" step="1" placeholder="Items" aria-label="Number of items">
+          <button class="btn btn-primary btn-sm" type="submit"><svg><use href="#i-plus"/></svg> Add assessment</button>
+        </form>
+        <div class="table-scroll"><table class="list-table" id="assessmentTable"></table></div>
+      </section>
+
+      <section class="sheet">
+        <div class="panel-head"><svg><use href="#i-table"/></svg> All 4 quarters · <span id="quarterOverviewSubject"></span> <small>items and class average per quarter</small></div>
+        <div class="table-scroll"><table class="list-table" id="quarterOverview"></table></div>
+      </section>
+      <p class="how-note"><svg><use href="#i-info"/></svg> Changing an item count keeps existing scores but caps any score above the new total. Deleting an assessment also deletes its scores.</p>
+    </section>
+
+    <!-- ============ STUDENTS ============ -->
+    <section class="view" id="viewStudents" hidden>
+      <div class="page-head page-head-row">
+        <div><span class="kicker">ROSTER</span><h1>Students</h1>
+          <p>Add, rename or remove students. Click a name to rename it, or open the full editor for ID and section.</p></div>
+        <button class="btn btn-primary" id="addStudentBtn2" type="button"><svg><use href="#i-plus"/></svg> Add student</button>
+      </div>
+      <section class="sheet">
+        <div class="sheet-toolbar">
+          <label class="search-box"><svg><use href="#i-search"/></svg><input type="search" id="studentSearch" placeholder="Search name, ID or section…" aria-label="Search students" autocomplete="off"></label>
+          <span class="student-count" id="studentCount"></span>
+        </div>
+        <div class="table-scroll"><table class="list-table">
+          <thead><tr><th>Student ID</th><th>Student Name</th><th>Section</th><th class="actions-col">Actions</th></tr></thead>
+          <tbody id="studentBody"></tbody></table></div>
+      </section>
+    </section>
+
+    <!-- ============ REPORT CARD ============ -->
+    <section class="view" id="viewReport" hidden>
+      <div class="page-head page-head-row">
+        <div><span class="kicker">REPORT CARD</span><h1>Student report card</h1>
+          <p>Quarter grades, final grade and general average across all subjects — the way a school report card shows them.</p></div>
+        <div class="head-actions">
+          <button class="btn btn-ghost" id="exportReportBtn" type="button"><svg><use href="#i-download"/></svg> Export all reports</button>
+          <button class="btn btn-primary" id="printReportBtn" type="button"><svg><use href="#i-print"/></svg> Print report card</button>
+        </div>
+      </div>
+      <div class="picker"><div class="picker-row">
+        <span class="picker-label"><svg><use href="#i-users"/></svg> Student</span>
+        <select id="reportStudent" aria-label="Select student"></select>
+        <span class="picker-note" id="reportMeta"></span>
+      </div></div>
+      <section class="sheet report-sheet" id="reportSheet"></section>
+    </section>
+
+    <!-- ============ CLASS AVERAGE ============ -->
+    <section class="view" id="viewAverage" hidden>
+      <div class="page-head"><span class="kicker">REPORTS</span><h1>Class Average</h1>
+        <p>Averages across <strong>all subjects</strong> and the quarter you pick. Nothing here needs to be typed.</p></div>
+      <div class="picker"><div class="picker-row">
+        <span class="picker-label"><svg><use href="#i-chart"/></svg> Quarter</span>
+        <select id="avgQuarter" aria-label="Filter by quarter">
+          <option value="all">All quarters</option><option value="q1">1st Quarter</option>
+          <option value="q2">2nd Quarter</option><option value="q3">3rd Quarter</option><option value="q4">4th Quarter</option>
+        </select>
+        <span class="picker-note">Showing every subject: <strong id="avgSubjectNames"></strong></span>
+      </div></div>
+      <section class="stats" id="avgStats" aria-label="Class statistics"></section>
+      <div class="avg-grid">
+        <section class="sheet"><div class="panel-head"><svg><use href="#i-book"/></svg> Averages by subject <small>per quarter</small></div>
+          <div class="table-scroll"><table class="list-table" id="subjectMatrix"></table></div></section>
+        <section class="sheet"><div class="panel-head"><svg><use href="#i-chart"/></svg> Grade distribution <small>grades given</small></div>
+          <div class="dist-wrap" id="distBars"></div></section>
+      </div>
+      <div class="avg-grid">
+        <section class="sheet"><div class="panel-head"><svg><use href="#i-list"/></svg> Category averages <small>class average of each category %</small></div>
+          <div class="table-scroll"><table class="list-table" id="categoryMatrix"></table></div></section>
+        <section class="sheet"><div class="panel-head"><svg><use href="#i-table"/></svg> Assessment breakdown <small id="breakdownLabel"></small></div>
+          <div class="table-scroll"><table class="list-table" id="assessmentBreakdown"></table></div></section>
+      </div>
+      <section class="sheet"><div class="panel-head"><svg><use href="#i-trophy"/></svg> Student ranking <small>average of all graded entries in the selected quarter(s)</small></div>
+        <div class="table-scroll"><table class="list-table" id="rankingTable"></table></div></section>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="container footer-inner">
+    <span>Teacher's Gradebook · <span id="year">2026</span></span>
+    <span>HTML · CSS · JavaScript · localStorage</span>
+  </div></footer>
+</div>
+
+<!-- ================= MODALS ================= -->
+<div class="modal-backdrop" id="randomModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="randomTitle">
+    <div class="modal-head"><h3 id="randomTitle">Fill with random grades</h3><button class="icon-btn" type="button" data-close="randomModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <div class="modal-body">
+      <p class="modal-hint">Every choice below fills grades for <strong>all <span id="randStudentCount">40</span> students</strong> — nobody is left out. Generated scores are ordinary grades, so every cell stays editable; you can also clear the sheet afterwards.</p>
+      <label class="form-field"><span>Which class records should all students get grades in?</span>
+        <select id="randScope" aria-label="Scope">
+          <option value="sheet">All students · this subject &amp; quarter only</option>
+          <option value="quarters">All students · all 4 quarters of this subject</option>
+          <option value="all">All students · every subject and quarter</option>
+        </select></label>
+      <button class="rand-shortcut" id="randAllShortcut" type="button"><svg><use href="#i-spark"/></svg> One click: all students, every subject &amp; quarter</button>
+      <label class="form-field"><span>Score range</span>
+        <select id="randRange" aria-label="Score range">
+          <option value="typical">Typical class (55–98%)</option>
+          <option value="wide">Wide spread (30–100%)</option>
+          <option value="high">High achieving (75–100%)</option>
+        </select></label>
+      <label class="form-field"><span>Existing scores</span>
+        <select id="randMode" aria-label="Existing scores">
+          <option value="blank">Fill blank cells only (keep what I typed)</option>
+          <option value="replace">Replace every score</option>
+        </select></label>
+      <p class="rand-preview" id="randPreview"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" data-close="randomModal">Cancel</button>
+      <button class="btn btn-primary" type="button" id="generateRandomBtn"><svg><use href="#i-spark"/></svg> Generate grades</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="studentModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
+    <div class="modal-head"><h3 id="studentModalTitle">Add student</h3><button class="icon-btn" type="button" data-close="studentModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <form id="studentForm" novalidate><div class="modal-body">
+      <label class="form-field"><span>Student ID / no. <em>*</em></span><input id="stuNo" type="text" maxlength="60" placeholder="e.g. 2026-41" required></label>
+      <label class="form-field"><span>Full name <em>*</em></span><input id="stuName" type="text" maxlength="80" placeholder="e.g. Juan Dela Cruz" required></label>
+      <label class="form-field"><span>Section</span><input id="stuSection" type="text" maxlength="60" placeholder="e.g. BSIT-1A"></label>
+    </div><div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="studentModal">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save student <svg><use href="#i-check"/></svg></button></div></form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="subjectModal" hidden>
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">
+    <div class="modal-head"><h3 id="subjectModalTitle">Manage subjects</h3><button class="icon-btn" type="button" data-close="subjectModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <div class="modal-body"><p class="modal-hint">Rename a subject and click Save. Every subject appears on the Subjects page and in all reports.</p>
+      <div class="subject-list" id="subjectList"></div>
+      <div class="add-subject-row"><input id="newSubjectName" type="text" maxlength="60" placeholder="New subject name…" aria-label="New subject name">
+        <button class="btn btn-ghost btn-sm" id="addSubjectBtn" type="button"><svg><use href="#i-plus"/></svg> Add subject</button></div>
+    </div><div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="subjectModal">Close</button>
+      <button class="btn btn-primary" type="button" id="saveSubjectsBtn">Save changes <svg><use href="#i-check"/></svg></button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="quickModal" hidden>
+  <div class="modal modal-quick" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
+    <div class="modal-head"><h3 id="quickTitle">Edit</h3><button class="icon-btn" type="button" data-close="quickModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <form id="quickForm" novalidate><div class="modal-body"><p class="modal-hint" id="quickHint"></p>
+      <label class="form-field"><span id="quickLabel">Name</span><input id="quickInput" type="text" maxlength="80" required></label>
+      <p class="auth-error" id="quickError" hidden></p>
+    </div><div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="quickModal">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save <svg><use href="#i-check"/></svg></button></div></form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="assessmentModal" hidden>
+  <div class="modal modal-quick" role="dialog" aria-modal="true" aria-labelledby="assessmentModalTitle">
+    <div class="modal-head"><h3 id="assessmentModalTitle">Edit assessment</h3><button class="icon-btn" type="button" data-close="assessmentModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <form id="assessmentEditForm" novalidate><div class="modal-body">
+      <label class="form-field"><span>Category</span><select id="editAssessComp" aria-label="Category"></select></label>
+      <label class="form-field"><span>Assessment name <em>*</em></span><input id="editAssessName" type="text" maxlength="60" required></label>
+      <label class="form-field"><span>Number of items <em>*</em></span><input id="editAssessItems" type="number" min="1" max="1000" step="1" required></label>
+      <p class="auth-error" id="assessmentEditError" hidden></p>
+    </div><div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="assessmentModal">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save <svg><use href="#i-check"/></svg></button></div></form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal" hidden>
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-head"><h3 id="settingsTitle">Grading settings</h3><button class="icon-btn" type="button" data-close="settingsModal" aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <div class="modal-body">
+      <p class="modal-hint">These settings apply to every subject and quarter.</p>
+      <label class="form-field"><span>How is the quarter grade computed?</span><select id="settingFormula" aria-label="Grading formula"></select></label>
+      <p class="setting-desc" id="formulaDesc"></p>
+      <div class="weights-row" id="weightsRow" hidden>
+        <label><span>Written Works %</span><input id="wWW" type="number" min="0" max="100" step="1"></label>
+        <label><span>Performance Tasks %</span><input id="wPT" type="number" min="0" max="100" step="1"></label>
+        <label><span>Quarterly Assessment %</span><input id="wQA" type="number" min="0" max="100" step="1"></label>
+        <span class="weights-total" id="weightsTotal"></span>
+      </div>
+      <div class="settings-two">
+        <label class="form-field"><span>Grade scale</span><select id="settingScale" aria-label="Grade scale">
+          <option value="college">College grade point (1.00 – 5.00)</option>
+          <option value="letter">Letters (A – F)</option></select></label>
+        <label class="form-field"><span>Passing mark</span><input id="settingPassing" type="number" min="0" max="100" step="1"></label>
+      </div>
+      <p class="setting-desc" id="scaleDesc"></p>
+      <p class="auth-error" id="settingsError" hidden></p>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="settingsModal">Cancel</button>
+      <button class="btn btn-primary" type="button" id="saveSettingsBtn">Save settings <svg><use href="#i-check"/></svg></button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="confirmModal" hidden>
+  <div class="modal modal-small" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-icon"><svg><use href="#i-trash"/></svg></div><h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmText" class="muted"></p>
+    <div class="modal-actions"><button class="btn btn-ghost" type="button" data-close="confirmModal">Cancel</button>
+      <button class="btn btn-danger" type="button" id="confirmOk">Confirm</button></div>
+  </div>
+</div>
+
+<button class="to-top" id="toTop" type="button" hidden aria-label="Back to top" title="Back to top"><svg><use href="#i-up"/></svg></button>
+<div class="toast-stack" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+   Teacher's Gradebook — pure logic (no DOM). Embedded into index.html.
+   Real school grading: assessments with a number of items, raw scores,
+   category averages, quarter grades, final grades and report cards.
+   ========================================================================== */
+const GradeEngine = (function () {
+  'use strict';
+
+  const DEFAULT_SECTION = 'BSIT-1A';
+
+  // Categories used by the school. `group` is the DepEd K–12 component group.
+  const COMPONENTS = [
+    { key: 'quiz', label: 'Quiz', group: 'WW' },
+    { key: 'assignment', label: 'Assignment', group: 'PT' },
+    { key: 'project', label: 'Project', group: 'PT' },
+    { key: 'recitation', label: 'Recitation', group: 'PT' },
+    { key: 'exam', label: 'Exam', group: 'QA' }
+  ];
+  const COMP_BY_KEY = {};
+  COMPONENTS.forEach(function (c) { COMP_BY_KEY[c.key] = c; });
+
+  const QUARTERS = [
+    { key: 'q1', label: '1st Quarter' },
+    { key: 'q2', label: '2nd Quarter' },
+    { key: 'q3', label: '3rd Quarter' },
+    { key: 'q4', label: '4th Quarter' }
+  ];
+
+  const DEFAULT_SUBJECTS = [
+    { id: 'sub-1', name: 'Computer Laboratory' },
+    { id: 'sub-2', name: 'Programming Fundamentals' },
+    { id: 'sub-3', name: 'Database Systems' }
+  ];
+
+  const FORMULAS = [
+    { id: 'equal', label: 'Equal category average',
+      desc: 'The 5 category percentages are averaged, so each category counts the same.' },
+    { id: 'points', label: 'Total points / total items',
+      desc: 'All scores added up, divided by all items, times 100. Assessments with more items count more.' },
+    { id: 'deped', label: 'DepEd K–12 (WW / PT / QA)',
+      desc: 'Written Works (Quiz), Performance Tasks (Assignment, Project, Recitation), and Quarterly Assessment (Exam) with adjustable weights.' }
+  ];
+
+  // Philippine college grade-point scale and the simple letter scale.
+  const SCALES = {
+    college: [
+      { min: 97, label: '1.00', gp: 1.00 }, { min: 94, label: '1.25', gp: 1.25 },
+      { min: 91, label: '1.50', gp: 1.50 }, { min: 88, label: '1.75', gp: 1.75 },
+      { min: 85, label: '2.00', gp: 2.00 }, { min: 82, label: '2.25', gp: 2.25 },
+      { min: 79, label: '2.50', gp: 2.50 }, { min: 76, label: '2.75', gp: 2.75 },
+      { min: 75, label: '3.00', gp: 3.00 }, { min: 0, label: '5.00', gp: 5.00 }
+    ],
+    letter: [
+      { min: 90, label: 'A', gp: 4.00 }, { min: 80, label: 'B', gp: 3.00 },
+      { min: 70, label: 'C', gp: 2.00 }, { min: 60, label: 'D', gp: 1.00 },
+      { min: 0, label: 'F', gp: 0.00 }
+    ]
+  };
+
+  const DEFAULT_SETTINGS = {
+    formula: 'equal', scale: 'college', passing: 75,
+    weights: { WW: 30, PT: 50, QA: 20 }
+  };
+
+  // Sensible starting assessments. Teachers can add/edit/delete these.
+  function defaultAssessments() {
+    return [
+      { id: 'a-quiz-1', component: 'quiz', name: 'Quiz 1', items: 20 },
+      { id: 'a-quiz-2', component: 'quiz', name: 'Quiz 2', items: 20 },
+      { id: 'a-assignment-1', component: 'assignment', name: 'Assignment 1', items: 20 },
+      { id: 'a-project-1', component: 'project', name: 'Project 1', items: 50 },
+      { id: 'a-recitation-1', component: 'recitation', name: 'Recitation 1', items: 10 },
+      { id: 'a-exam-1', component: 'exam', name: 'Exam 1', items: 50 }
+    ];
+  }
+
+  const DEFAULT_ROSTER = [
+    ['2026-01', 'ALTHEA MONDE'], ['2026-02', 'ELIJAH JONES'],
+    ['2026-03', 'MIKEALA SIGMA'], ['2026-04', 'TRISTAN HAND'],
+    ['2026-05', 'BIANCA SOME'], ['2026-06', 'LORENZO FATT'],
+    ['2026-07', 'CAMILLE REYES'], ['2026-08', 'DOMINIC SANTOS'],
+    ['2026-09', 'ANDREA CRUZ'], ['2026-10', 'CEDRIC RAMOS'],
+    ['2026-11', 'SAMANTHA FLORES'], ['2026-12', 'RAFAEL GARCIA'],
+    ['2026-13', 'NICOLE MENDOZA'], ['2026-14', 'JEREMIAH TORRES'],
+    ['2026-15', 'ANGELA NAVARRO'], ['2026-16', 'CHRISTIAN CASTILLO'],
+    ['2026-17', 'PATRICIA AQUINO'], ['2026-18', 'XAVIER VILLANUEVA'],
+    ['2026-19', 'DENISE MERCADO'], ['2026-20', 'GABRIEL VALDEZ'],
+    ['2026-21', 'ISABELLE FERNANDEZ'], ['2026-22', 'MATTHEW DELA CRUZ'],
+    ['2026-23', 'CHRISTIAN BAUTISTA'], ['2026-24', 'JASMINE MANALO'],
+    ['2026-25', 'ARAH DOMINGUEZ'], ['2026-26', 'KESIE SALAZAR'],
+    ['2026-27', 'ANDREA PASCUAL'], ['2026-28', 'NIKKO EVANGELISTA'],
+    ['2026-29', 'SCOTT MIRANDA'], ['2026-30', 'NATHANIEL AGUILAR'],
+    ['2026-31', 'SOPHIA DE LEON'], ['2026-32', 'KENNETH RIVERA'],
+    ['2026-33', 'ALYSSA CABRERA'], ['2026-34', 'SEBASTIAN LIM'],
+    ['2026-35', 'KATRINA TAN'], ['2026-36', 'VINCENT SY'],
+    ['2026-37', 'ANGELIA PEREZ'], ['2026-38', 'JOAQUIN OCAMPO'],
+    ['2026-39', 'FRANCESCA LAUREL'], ['2026-40', 'KARYLLE ARANZA']
+  ];
+
+  function makeId(prefix) {
+    return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+  function r2(n) { return Math.round(n * 100) / 100; }
+  function mean(list) { return list.length ? r2(list.reduce(function (a, b) { return a + b; }, 0) / list.length) : null; }
+
+  // ------------------------------------------------------------- SHA-256 (pure JS)
+  const K256 = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  function utf8Bytes(s) {
+    var out = [];
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+        var c2 = s.charCodeAt(i + 1), cp = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        i++; out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+      } else out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    return out;
+  }
+  function sha256(msg) {
+    var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    var d = utf8Bytes(String(msg)), bits = d.length * 8;
+    d.push(0x80); while (d.length % 64 !== 56) d.push(0);
+    var hi = Math.floor(bits / 0x100000000), lo = bits >>> 0;
+    d.push((hi >>> 24) & 255, (hi >>> 16) & 255, (hi >>> 8) & 255, hi & 255,
+           (lo >>> 24) & 255, (lo >>> 16) & 255, (lo >>> 8) & 255, lo & 255);
+    function add(a, b) { return (a + b) >>> 0; }
+    function rotr(x, n) { return ((x >>> n) | (x << (32 - n))) >>> 0; }
+    for (var off = 0; off < d.length; off += 64) {
+      var w = new Array(64), i;
+      for (i = 0; i < 16; i++) w[i] = ((d[off + 4 * i] << 24) | (d[off + 4 * i + 1] << 16) | (d[off + 4 * i + 2] << 8) | d[off + 4 * i + 3]) >>> 0;
+      for (i = 16; i < 64; i++) {
+        var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = add(add(add(w[i - 16], s0), w[i - 7]), s1);
+      }
+      var a = H[0], b = H[1], c = H[2], e = H[4], f = H[5], g = H[6], h = H[7], vd = H[3];
+      for (i = 0; i < 64; i++) {
+        var S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25), ch = (e & f) ^ ((~e) & g);
+        var t1 = add(add(add(add(h, S1), ch), K256[i]), w[i]);
+        var S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22), maj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = add(S0, maj);
+        h = g; g = f; f = e; e = add(vd, t1); vd = c; c = b; b = a; a = add(t1, t2);
+      }
+      H[0] = add(H[0], a); H[1] = add(H[1], b); H[2] = add(H[2], c); H[3] = add(H[3], vd);
+      H[4] = add(H[4], e); H[5] = add(H[5], f); H[6] = add(H[6], g); H[7] = add(H[7], h);
+    }
+    return H.map(function (x) { return ('00000000' + x.toString(16)).slice(-8); }).join('');
+  }
+
+  // ------------------------------------------------------------ teacher account
+  function createAccount(teacherName, username, password) {
+    var name = String(teacherName || '').trim().slice(0, 80);
+    var user = String(username || '').trim().toLowerCase().slice(0, 60);
+    var pass = String(password || '');
+    if (!name || !user || pass.length < 4) return null;
+    var salt = makeId('salt');
+    return { teacherName: name, username: user, salt: salt,
+      hash: sha256(salt + '|' + user + '|' + pass), createdAt: new Date().toISOString() };
+  }
+  function checkPassword(account, username, password) {
+    if (!account || typeof account.hash !== 'string' || typeof account.salt !== 'string') return false;
+    var user = String(username || '').trim().toLowerCase();
+    if (user !== account.username) return false;
+    return sha256(account.salt + '|' + user + '|' + String(password || '')) === account.hash;
+  }
+  function sessionToken(account) { return account && account.hash ? sha256(account.hash + '|' + account.salt + '|session') : null; }
+
+  // ------------------------------------------------------------------ keys
+  function sheetKey(subjectId, quarterKey) { return subjectId + '|' + quarterKey; }
+  function scoreKey(subjectId, quarterKey, studentId, assessmentId) {
+    return subjectId + '|' + quarterKey + '|' + studentId + '|' + assessmentId;
+  }
+  function getAssessments(state, subjectId, quarterKey) {
+    return state.assessments[sheetKey(subjectId, quarterKey)] || [];
+  }
+
+  function defaultState() {
+    var st = {
+      subjects: DEFAULT_SUBJECTS.map(function (s) { return { id: s.id, name: s.name }; }),
+      students: DEFAULT_ROSTER.map(function (r, i) { return { id: 'stu-' + (i + 1), no: r[0], name: r[1], section: DEFAULT_SECTION }; }),
+      assessments: {}, scores: {},
+      settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
+      activeSubject: 'sub-1', activeQuarter: 'q1', updatedAt: null,
+      sampleSeeded: false
+    };
+    st.subjects.forEach(function (s) { QUARTERS.forEach(function (q) { st.assessments[sheetKey(s.id, q.key)] = defaultAssessments(); }); });
+    return st;
+  }
+
+  // -------------------------------------------------------------- grade scale
+  function bands(state) { return SCALES[state.settings.scale] || SCALES.college; }
+  function bandFor(avg, state) {
+    var list = bands(state);
+    return list.find(function (b) { return avg >= b.min; }) || list[list.length - 1];
+  }
+  function summarise(avg, state) {
+    if (avg === null) return { label: null, gp: null, remark: null, pass: false };
+    var b = bandFor(avg, state);
+    var pass = avg >= state.settings.passing;
+    return { label: b.label, gp: b.gp, remark: pass ? 'Pass' : 'Fail', pass: pass };
+  }
+
+  // ---------------------------------------------------------- quarter grade
+  // A student's quarter grade from raw scores over assessment item counts.
+  function resultFor(state, subjectId, quarterKey, studentId) {
+    var list = getAssessments(state, subjectId, quarterKey);
+    var empty = { avg: null, label: null, gp: null, remark: null, pass: false,
+      earned: 0, possible: 0, entered: 0, total: list.length, partial: false,
+      components: {}, categoryPcts: {}, renormalized: false };
+    if (!list.length) return empty;
+
+    var byComp = {}, byGroup = {};
+    COMPONENTS.forEach(function (c) { byComp[c.key] = { earned: 0, possible: 0, entered: 0 }; });
+    ['WW', 'PT', 'QA'].forEach(function (g) { byGroup[g] = { earned: 0, possible: 0, entered: 0 }; });
+
+    var earned = 0, possible = 0, entered = 0, categoryPcts = {}, components = {};
+    list.forEach(function (a) {
+      if (!COMP_BY_KEY[a.component]) return;
+      var v = state.scores[scoreKey(subjectId, quarterKey, studentId, a.id)];
+      if (typeof v !== 'number' || !Number.isFinite(v)) return;
+      var score = Math.max(0, Math.min(a.items, v));
+      byComp[a.component].earned += score; byComp[a.component].possible += a.items; byComp[a.component].entered++;
+      var g = COMP_BY_KEY[a.component].group;
+      byGroup[g].earned += score; byGroup[g].possible += a.items; byGroup[g].entered++;
+      earned += score; possible += a.items; entered++;
+    });
+    if (!entered || !possible) return empty;
+
+    COMPONENTS.forEach(function (c) {
+      if (byComp[c.key].entered) {
+        var p = r2(byComp[c.key].earned / byComp[c.key].possible * 100);
+        categoryPcts[c.key] = p;
+        components[c.key] = { percentage: p, earned: r2(byComp[c.key].earned),
+          items: byComp[c.key].possible, count: byComp[c.key].entered };
+      }
+    });
+
+    var avg = null, renormalized = false, formula = state.settings.formula;
+    if (formula === 'points') {
+      avg = r2(earned / possible * 100);
+    } else if (formula === 'deped') {
+      var w = state.settings.weights, used = 0, sum = 0;
+      ['WW', 'PT', 'QA'].forEach(function (g) {
+        if (byGroup[g].entered && byGroup[g].possible) {
+          var pct = byGroup[g].earned / byGroup[g].possible * 100;
+          sum += pct * (Number(w[g]) || 0); used += Number(w[g]) || 0;
+        }
+      });
+      if (used > 0) { avg = r2(sum / used); renormalized = Math.abs(used - 100) > 0.001; }
+      else avg = r2(earned / possible * 100);
+    } else { // equal
+      var vals = Object.keys(categoryPcts).map(function (k) { return categoryPcts[k]; });
+      avg = mean(vals);
+    }
+    if (avg === null) avg = r2(earned / possible * 100);
+    var s = summarise(avg, state);
+    return { avg: avg, label: s.label, gp: s.gp, remark: s.remark, pass: s.pass,
+      earned: r2(earned), possible: possible, entered: entered, total: list.length,
+      partial: entered < list.length, components: components, categoryPcts: categoryPcts,
+      renormalized: renormalized };
+  }
+
+  function quarterGrades(state, subjectId, studentId) {
+    var q = {};
+    QUARTERS.forEach(function (x) { q[x.key] = resultFor(state, subjectId, x.key, studentId); });
+    var vals = QUARTERS.map(function (x) { return q[x.key].avg; }).filter(function (v) { return v !== null; });
+    var final = mean(vals), s = summarise(final, state);
+    return { quarters: q, final: final, label: s.label, gp: s.gp, remark: s.remark, pass: s.pass, completed: vals.length };
+  }
+
+  function reportCard(state, studentId) {
+    var rows = state.subjects.map(function (sub) {
+      var g = quarterGrades(state, sub.id, studentId);
+      return { id: sub.id, name: sub.name, quarters: g.quarters, final: g.final,
+        label: g.label, gp: g.gp, remark: g.remark, pass: g.pass, completed: g.completed };
+    });
+    var finals = rows.map(function (r) { return r.final; }).filter(function (v) { return v !== null; });
+    var general = mean(finals), s = summarise(general, state);
+    return { rows: rows, general: general, label: s.label, gp: s.gp, remark: s.remark, pass: s.pass };
+  }
+
+  // ------------------------------------------------------------- sheet summaries
+  function sheetSummary(state, subjectId, quarterKey) {
+    var list = getAssessments(state, subjectId, quarterKey);
+    var perComponent = COMPONENTS.map(function (c) {
+      var mine = list.filter(function (a) { return a.component === c.key; });
+      var sumEarned = 0, sumPossible = 0;
+      state.students.forEach(function (st) {
+        mine.forEach(function (a) {
+          var v = state.scores[scoreKey(subjectId, quarterKey, st.id, a.id)];
+          if (typeof v === 'number' && Number.isFinite(v)) {
+            sumEarned += Math.max(0, Math.min(a.items, v)); sumPossible += a.items;
+          }
+        });
+      });
+      return { key: c.key, label: c.label, count: mine.length,
+        totalItems: mine.reduce(function (n, a) { return n + a.items; }, 0),
+        classPct: sumPossible ? r2(sumEarned / sumPossible * 100) : null };
+    });
+    return { assessments: list.length,
+      totalItems: list.reduce(function (n, a) { return n + a.items; }, 0),
+      perComponent: perComponent };
+  }
+
+  function assessmentStats(state, subjectId, quarterKey) {
+    return getAssessments(state, subjectId, quarterKey).map(function (a) {
+      var vals = [];
+      state.students.forEach(function (st) {
+        var v = state.scores[scoreKey(subjectId, quarterKey, st.id, a.id)];
+        if (typeof v === 'number' && Number.isFinite(v)) vals.push(Math.max(0, Math.min(a.items, v)));
+      });
+      var m = mean(vals);
+      return { id: a.id, name: a.name, component: a.component, items: a.items,
+        entered: vals.length, avgScore: m,
+        avgPct: m === null ? null : r2(m / a.items * 100),
+        highest: vals.length ? Math.max.apply(null, vals) : null,
+        lowest: vals.length ? Math.min.apply(null, vals) : null };
+    });
+  }
+
+  function quarterMatrix(state, subjectId) {
+    return QUARTERS.map(function (q) {
+      var list = getAssessments(state, subjectId, q.key);
+      var vals = [];
+      state.students.forEach(function (st) {
+        var r = resultFor(state, subjectId, q.key, st.id);
+        if (r.avg !== null) vals.push(r.avg);
+      });
+      return { key: q.key, label: q.label, assessments: list.length,
+        totalItems: list.reduce(function (n, a) { return n + a.items; }, 0),
+        average: mean(vals), graded: vals.length };
+    });
+  }
+
+  // ------------------------------------------------------------ class statistics
+  function collectResults(state, subjectIds, quarterKeys) {
+    var out = [];
+    subjectIds.forEach(function (sid) {
+      quarterKeys.forEach(function (qk) {
+        state.students.forEach(function (st) {
+          var r = resultFor(state, sid, qk, st.id);
+          if (r.avg !== null) out.push({ subjectId: sid, quarterKey: qk, studentId: st.id,
+            name: st.name, avg: r.avg, label: r.label, remark: r.remark,
+            pass: r.pass, components: r.components });
+        });
+      });
+    });
+    return out;
+  }
+  function classStats(state, subjectFilter, quarterFilter) {
+    var subjectIds = subjectFilter === 'all' ? state.subjects.map(function (s) { return s.id; }) : [subjectFilter];
+    var quarterKeys = quarterFilter === 'all' ? QUARTERS.map(function (q) { return q.key; }) : [quarterFilter];
+    var results = collectResults(state, subjectIds, quarterKeys);
+    var averages = results.map(function (r) { return r.avg; });
+    var distribution = {};
+    bands(state).forEach(function (b) { distribution[b.label] = 0; });
+    results.forEach(function (r) { distribution[r.label] = (distribution[r.label] || 0) + 1; });
+
+    var perComponent = COMPONENTS.map(function (c) {
+      var vals = [];
+      results.forEach(function (r) { if (r.components[c.key]) vals.push(r.components[c.key].percentage); });
+      return { key: c.key, label: c.label, average: mean(vals), graded: vals.length };
+    });
+
+    var perStudent = state.students.map(function (st) {
+      var mine = results.filter(function (r) { return r.studentId === st.id; });
+      var avg = mean(mine.map(function (r) { return r.avg; }));
+      var s = summarise(avg, state);
+      return { id: st.id, no: st.no, name: st.name, section: st.section, average: avg,
+        entries: mine.length, label: s.label, gp: s.gp, remark: s.remark, pass: s.pass };
+    }).sort(function (a, b) {
+      if (a.average === null && b.average === null) return a.name.localeCompare(b.name);
+      if (a.average === null) return 1;
+      if (b.average === null) return -1;
+      return b.average - a.average || a.name.localeCompare(b.name);
+    });
+
+    var perSubject = state.subjects.filter(function (s) { return subjectIds.indexOf(s.id) !== -1; })
+      .map(function (s) {
+        var rows = results.filter(function (r) { return r.subjectId === s.id; });
+        return { id: s.id, name: s.name, average: mean(rows.map(function (r) { return r.avg; })), graded: rows.length,
+          passRate: rows.length ? r2(rows.filter(function (r) { return r.pass; }).length / rows.length * 100) : null,
+          quarters: QUARTERS.filter(function (q) { return quarterKeys.indexOf(q.key) !== -1; })
+            .map(function (q) {
+              var qr = results.filter(function (r) { return r.subjectId === s.id && r.quarterKey === q.key; });
+              return { key: q.key, label: q.label, average: mean(qr.map(function (r) { return r.avg; })), graded: qr.length };
+            }) };
+      });
+
+    var perQuarter = QUARTERS.filter(function (q) { return quarterKeys.indexOf(q.key) !== -1; })
+      .map(function (q) {
+        var qr = results.filter(function (r) { return r.quarterKey === q.key; });
+        return { key: q.key, label: q.label, average: mean(qr.map(function (r) { return r.avg; })), graded: qr.length };
+      });
+
+    return { studentCount: state.students.length, graded: results.length,
+      average: mean(averages), highest: averages.length ? Math.max.apply(null, averages) : null,
+      lowest: averages.length ? Math.min.apply(null, averages) : null,
+      passRate: results.length ? r2(results.filter(function (r) { return r.pass; }).length / results.length * 100) : null,
+      distribution: distribution, perComponent: perComponent,
+      perStudent: perStudent, perSubject: perSubject, perQuarter: perQuarter };
+  }
+
+  // ------------------------------------------------------------------ CSV
+  function csvCell(value) {
+    var s = String(value === null || value === undefined ? '' : value);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  function buildCsv(state, subjectId, quarterKey) {
+    var subject = state.subjects.find(function (s) { return s.id === subjectId; });
+    var quarter = QUARTERS.find(function (q) { return q.key === quarterKey; });
+    var formula = FORMULAS.find(function (f) { return f.id === state.settings.formula; });
+    var list = getAssessments(state, subjectId, quarterKey);
+    var lines = [];
+    lines.push([(subject ? subject.name : 'Subject') + ' — ' + (quarter ? quarter.label : 'Quarter') +
+      ' · ' + (formula ? formula.label : '')].map(csvCell).join(','));
+    lines.push(['TOTAL ITEMS', '', ''].concat(list.map(function (a) { return a.items; }))
+      .concat([list.reduce(function (n, a) { return n + a.items; }, 0), '']).map(csvCell).join(','));
+    lines.push(['Student ID', 'Student Name', 'Section']
+      .concat(list.map(function (a) { return a.name + ' (' + a.items + ' items)'; }))
+      .concat(['Total Score', 'Total Items', 'Quarter Grade', 'Grade Point', 'Remark']).map(csvCell).join(','));
+    state.students.forEach(function (st) {
+      var r = resultFor(state, subjectId, quarterKey, st.id);
+      lines.push([st.no, st.name, st.section]
+        .concat(list.map(function (a) {
+          var v = state.scores[scoreKey(subjectId, quarterKey, st.id, a.id)];
+          return typeof v === 'number' ? v : '';
+        }))
+        .concat([Math.round(r.earned), r.possible, r.avg === null ? '' : Math.round(r.avg), r.label || '', r.remark || ''])
+        .map(csvCell).join(','));
+    });
+    return '\ufeff' + lines.join('\r\n');
+  }
+  function buildReportCsv(state) {
+    var lines = [['REPORT CARD'].map(csvCell).join(',')];
+    lines.push(['Student ID', 'Student Name', 'Section', 'Subject', '1st Quarter', '2nd Quarter',
+      '3rd Quarter', '4th Quarter', 'Final Grade', 'Grade Point', 'Remark'].map(csvCell).join(','));
+    state.students.forEach(function (st) {
+      reportCard(state, st.id).rows.forEach(function (row) {
+        lines.push([st.no, st.name, st.section, row.name]
+          .concat(QUARTERS.map(function (q) { return row.quarters[q.key].avg === null ? '' : Math.round(row.quarters[q.key].avg); }))
+          .concat([row.final === null ? '' : Math.round(row.final), row.label || '', row.remark || ''])
+          .map(csvCell).join(','));
+      });
+    });
+    return '\ufeff' + lines.join('\r\n');
+  }
+
+  // ------------------------------------------------------------ CRUD helpers
+  function addStudent(state, no, name, section) {
+    var st = { id: makeId('stu'), no: String(no || '').trim().slice(0, 60),
+      name: String(name || '').trim().slice(0, 80), section: String(section || '').trim().slice(0, 60) };
+    if (!st.no || !st.name) return null;
+    state.students.push(st); return st;
+  }
+  function updateStudent(state, id, no, name, section) {
+    var st = state.students.find(function (s) { return s.id === id; });
+    if (!st) return null;
+    var n = String(no || '').trim().slice(0, 60), nm = String(name || '').trim().slice(0, 80);
+    if (!n || !nm) return null;
+    st.no = n; st.name = nm; st.section = String(section || '').trim().slice(0, 60);
+    return st;
+  }
+  function renameStudent(state, id, name) {
+    var st = state.students.find(function (s) { return s.id === id; });
+    var nm = String(name || '').trim().slice(0, 80);
+    if (!st || !nm) return null;
+    st.name = nm; return st;
+  }
+  function removeStudent(state, id) {
+    state.students = state.students.filter(function (s) { return s.id !== id; });
+    Object.keys(state.scores).forEach(function (k) { if (k.split('|')[2] === id) delete state.scores[k]; });
+  }
+
+  function addSubject(state, name) {
+    var nm = String(name || '').trim().slice(0, 60);
+    if (!nm) return null;
+    var s = { id: makeId('sub'), name: nm };
+    state.subjects.push(s);
+    QUARTERS.forEach(function (q) { state.assessments[sheetKey(s.id, q.key)] = defaultAssessments(); });
+    return s;
+  }
+  function renameSubject(state, id, name) {
+    var s = state.subjects.find(function (x) { return x.id === id; });
+    var nm = String(name || '').trim().slice(0, 60);
+    if (!s || !nm) return null;
+    s.name = nm; return s;
+  }
+  function removeSubject(state, id) {
+    if (state.subjects.length <= 1) return false;
+    state.subjects = state.subjects.filter(function (s) { return s.id !== id; });
+    Object.keys(state.assessments).forEach(function (k) { if (k.split('|')[0] === id) delete state.assessments[k]; });
+    Object.keys(state.scores).forEach(function (k) { if (k.split('|')[0] === id) delete state.scores[k]; });
+    if (state.activeSubject === id) state.activeSubject = state.subjects[0].id;
+    return true;
+  }
+
+  function addAssessment(state, subjectId, quarterKey, component, name, items) {
+    if (!COMP_BY_KEY[component]) return null;
+    var nm = String(name || '').trim().slice(0, 60);
+    var it = Math.round(Number(items));
+    if (!nm || !Number.isFinite(it) || it < 1 || it > 1000) return null;
+    var list = state.assessments[sheetKey(subjectId, quarterKey)] || (state.assessments[sheetKey(subjectId, quarterKey)] = []);
+    var a = { id: makeId('a'), component: component, name: nm, items: it };
+    list.push(a); return a;
+  }
+  function updateAssessment(state, subjectId, quarterKey, id, name, items) {
+    var list = getAssessments(state, subjectId, quarterKey);
+    var a = list.find(function (x) { return x.id === id; });
+    if (!a) return null;
+    var nm = String(name || '').trim().slice(0, 60), it = Math.round(Number(items));
+    if (!nm || !Number.isFinite(it) || it < 1 || it > 1000) return null;
+    a.name = nm; a.items = it;
+    Object.keys(state.scores).forEach(function (k) {
+      var p = k.split('|');
+      if (p[0] === subjectId && p[1] === quarterKey && p[3] === id && state.scores[k] > it) state.scores[k] = it;
+    });
+    return a;
+  }
+  function removeAssessment(state, subjectId, quarterKey, id) {
+    var key = sheetKey(subjectId, quarterKey);
+    state.assessments[key] = (state.assessments[key] || []).filter(function (a) { return a.id !== id; });
+    Object.keys(state.scores).forEach(function (k) {
+      var p = k.split('|');
+      if (p[0] === subjectId && p[1] === quarterKey && p[3] === id) delete state.scores[k];
+    });
+  }
+  function copyAssessments(state, subjectId, fromQuarter) {
+    var src = getAssessments(state, subjectId, fromQuarter);
+    if (!src.length) return 0;
+    var n = 0;
+    QUARTERS.forEach(function (q) {
+      if (q.key === fromQuarter) return;
+      state.assessments[sheetKey(subjectId, q.key)] = src.map(function (a) {
+        return { id: makeId('a'), component: a.component, name: a.name, items: a.items };
+      });
+      // Scores for the other quarters are cleared because assessment ids changed.
+      Object.keys(state.scores).forEach(function (k) {
+        var p = k.split('|');
+        if (p[0] === subjectId && p[1] === q.key) delete state.scores[k];
+      });
+      n++;
+    });
+    return n;
+  }
+  function clearSheet(state, subjectId, quarterKey) {
+    Object.keys(state.scores).forEach(function (k) {
+      var p = k.split('|');
+      if (p[0] === subjectId && p[1] === quarterKey) delete state.scores[k];
+    });
+  }
+
+  // ------------------------------------------------- practice / demo grade filler
+  // Counts the score cells a random fill would touch (used for the preview).
+  function countFillableCells(state, subjectIds, quarterKeys, onlyBlank) {
+    var n = 0;
+    subjectIds.forEach(function (sid) {
+      quarterKeys.forEach(function (qk) {
+        getAssessments(state, sid, qk).forEach(function (a) {
+          state.students.forEach(function (st) {
+            var k = scoreKey(sid, qk, st.id, a.id);
+            if (onlyBlank && typeof state.scores[k] === 'number') return;
+            n++;
+          });
+        });
+      });
+    });
+    return n;
+  }
+
+  // Fills raw scores as a normal teacher would type them: a value between 0 and
+  // the assessment's item count. A triangular distribution keeps the class
+  // looking realistic instead of flat-random. These are ordinary scores, so
+  // every single cell remains editable afterwards.
+  function generateRandomGrades(state, options) {
+    var opts = options || {};
+    var subjectIds = (opts.subjectIds && opts.subjectIds.length) ? opts.subjectIds : [state.activeSubject];
+    var quarterKeys = (opts.quarterKeys && opts.quarterKeys.length) ? opts.quarterKeys : [state.activeQuarter];
+    var min = Number(opts.min), max = Number(opts.max);
+    if (!Number.isFinite(min)) min = 55;
+    if (!Number.isFinite(max)) max = 98;
+    min = Math.max(0, Math.min(100, min));
+    max = Math.max(0, Math.min(100, max));
+    if (max < min) { var swap = min; min = max; max = swap; }
+    var onlyBlank = opts.onlyBlank !== false, count = 0;
+    subjectIds.forEach(function (sid) {
+      quarterKeys.forEach(function (qk) {
+        getAssessments(state, sid, qk).forEach(function (a) {
+          state.students.forEach(function (st) {
+            var k = scoreKey(sid, qk, st.id, a.id);
+            if (onlyBlank && typeof state.scores[k] === 'number') return;
+            var mix = (Math.random() + Math.random()) / 2;
+            var pct = min + mix * (max - min);
+            // Whole numbers only — a raw score of 17, never 17.3
+            var score = Math.round(a.items * pct / 100);
+            state.scores[k] = Math.max(0, Math.min(a.items, score));
+            count++;
+          });
+        });
+      });
+    });
+    return count;
+  }
+
+  // Older saved files may contain decimal raw scores. Round them to whole
+  // numbers once so no grade cell ever shows a decimal point.
+  function roundScores(state) {
+    var changed = 0;
+    Object.keys(state.scores || {}).forEach(function (k) {
+      var v = Math.round(state.scores[k]);
+      if (v !== state.scores[k]) { state.scores[k] = v; changed++; }
+    });
+    return changed;
+  }
+
+  // -------------------------------------------------------------- sanitising
+  function legacyAssessments() {
+    return COMPONENTS.map(function (c) {
+      return { id: 'legacy-' + c.key, component: c.key, name: c.label, items: 100 };
+    });
+  }
+  function sanitizeState(raw) {
+    // Migrate the older 0–100 gradebook into item-based assessments.
+    if (raw && raw.grades && !raw.assessments) {
+      var migrated = { subjects: raw.subjects, students: raw.students, assessments: {}, scores: {},
+        activeSubject: raw.activeSubject, activeQuarter: raw.activeQuarter };
+      Object.keys(raw.grades).forEach(function (k) {
+        var p = k.split('|');
+        if (p.length !== 3) return;
+        var sk = sheetKey(p[0], p[1]);
+        if (!migrated.assessments[sk]) migrated.assessments[sk] = legacyAssessments();
+        COMPONENTS.forEach(function (c) {
+          var v = Number(raw.grades[k][c.key]);
+          if (Number.isFinite(v) && v >= 0 && v <= 100 && raw.grades[k][c.key] !== '' && raw.grades[k][c.key] !== null) {
+            migrated.scores[sk + '|' + p[2] + '|legacy-' + c.key] = r2(v);
+          }
+        });
+      });
+      raw = migrated;
+    }
+
+    var out = defaultState();
+    if (!raw || typeof raw !== 'object') return out;
+
+    if (Array.isArray(raw.subjects) && raw.subjects.length) {
+      var subs = [], seen = {};
+      raw.subjects.forEach(function (s) {
+        if (!s || typeof s.id !== 'string' || !s.id || typeof s.name !== 'string' || !s.name.trim() || seen[s.id]) return;
+        seen[s.id] = true; subs.push({ id: s.id, name: s.name.trim().slice(0, 60) });
+      });
+      if (subs.length) { out.subjects = subs.slice(0, 30); out.assessments = {};
+        out.subjects.forEach(function (s) { QUARTERS.forEach(function (q) { out.assessments[sheetKey(s.id, q.key)] = defaultAssessments(); }); }); }
+    }
+    if (Array.isArray(raw.students)) {
+      var sts = [], ids = {};
+      raw.students.forEach(function (s) {
+        if (!s || typeof s.id !== 'string' || !s.id || typeof s.name !== 'string' || !s.name.trim() || ids[s.id]) return;
+        ids[s.id] = true;
+        sts.push({ id: s.id, no: String(s.no || '').slice(0, 60),
+          name: s.name.trim().slice(0, 80), section: String(s.section || '').slice(0, 60) });
+      });
+      out.students = sts.slice(0, 500);
+    }
+
+    if (raw.settings && typeof raw.settings === 'object') {
+      var st = raw.settings;
+      if (FORMULAS.some(function (f) { return f.id === st.formula; })) out.settings.formula = st.formula;
+      if (SCALES[st.scale]) out.settings.scale = st.scale;
+      var pass = Number(st.passing);
+      if (Number.isFinite(pass) && pass >= 0 && pass <= 100) out.settings.passing = pass;
+      if (st.weights && typeof st.weights === 'object') {
+        ['WW', 'PT', 'QA'].forEach(function (g) {
+          var w = Number(st.weights[g]);
+          if (Number.isFinite(w) && w >= 0 && w <= 100) out.settings.weights[g] = w;
+        });
+      }
+    }
+
+    var validSubs = {}, validQ = {}, validStu = {};
+    out.subjects.forEach(function (s) { validSubs[s.id] = true; });
+    QUARTERS.forEach(function (q) { validQ[q.key] = true; });
+    out.students.forEach(function (s) { validStu[s.id] = true; });
+
+    if (raw.assessments && typeof raw.assessments === 'object' && !Array.isArray(raw.assessments)) {
+      Object.keys(raw.assessments).forEach(function (k) {
+        var p = k.split('|');
+        if (p.length !== 2 || !validSubs[p[0]] || !validQ[p[1]] || !Array.isArray(raw.assessments[k])) return;
+        var list = [], used = {};
+        raw.assessments[k].forEach(function (a) {
+          if (!a || typeof a.id !== 'string' || !a.id || used[a.id] || !COMP_BY_KEY[a.component]) return;
+          var it = Math.round(Number(a.items));
+          var nm = String(a.name || '').trim().slice(0, 60);
+          if (!nm || !Number.isFinite(it) || it < 1 || it > 1000) return;
+          used[a.id] = true;
+          list.push({ id: a.id, component: a.component, name: nm, items: it });
+        });
+        out.assessments[k] = list.slice(0, 60);
+      });
+    }
+
+    if (raw.scores && typeof raw.scores === 'object' && !Array.isArray(raw.scores)) {
+      Object.keys(raw.scores).forEach(function (k) {
+        var p = k.split('|');
+        if (p.length !== 4 || !validSubs[p[0]] || !validQ[p[1]] || !validStu[p[2]]) return;
+        var a = (out.assessments[sheetKey(p[0], p[1])] || []).find(function (x) { return x.id === p[3]; });
+        if (!a) return;
+        var v = Number(raw.scores[k]);
+        if (!Number.isFinite(v) || v < 0 || v > a.items) return;
+        out.scores[k] = r2(v);
+      });
+    }
+
+    out.activeSubject = validSubs[raw.activeSubject] ? raw.activeSubject : out.subjects[0].id;
+    out.activeQuarter = validQ[raw.activeQuarter] ? raw.activeQuarter : 'q1';
+    out.updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : null;
+    out.sampleSeeded = raw.sampleSeeded === true;
+    return out;
+  }
+
+  return {
+    DEFAULT_SECTION: DEFAULT_SECTION, COMPONENTS: COMPONENTS, QUARTERS: QUARTERS,
+    DEFAULT_SUBJECTS: DEFAULT_SUBJECTS, FORMULAS: FORMULAS, SCALES: SCALES,
+    DEFAULT_SETTINGS: DEFAULT_SETTINGS, DEFAULT_ROSTER: DEFAULT_ROSTER,
+    makeId: makeId, sha256: sha256, createAccount: createAccount,
+    checkPassword: checkPassword, sessionToken: sessionToken,
+    defaultAssessments: defaultAssessments, defaultState: defaultState, sanitizeState: sanitizeState,
+    sheetKey: sheetKey, scoreKey: scoreKey, getAssessments: getAssessments,
+    bands: bands, bandFor: bandFor, summarise: summarise,
+    resultFor: resultFor, quarterGrades: quarterGrades, reportCard: reportCard,
+    sheetSummary: sheetSummary, assessmentStats: assessmentStats, quarterMatrix: quarterMatrix,
+    classStats: classStats, buildCsv: buildCsv, buildReportCsv: buildReportCsv,
+    addStudent: addStudent, updateStudent: updateStudent, renameStudent: renameStudent,
+    removeStudent: removeStudent, addSubject: addSubject, renameSubject: renameSubject,
+    removeSubject: removeSubject, addAssessment: addAssessment, updateAssessment: updateAssessment,
+    removeAssessment: removeAssessment, copyAssessments: copyAssessments, clearSheet: clearSheet,
+    countFillableCells: countFillableCells, generateRandomGrades: generateRandomGrades,
+    roundScores: roundScores
+  };
+})();
+
+/* ==========================================================================
+   Teacher's Gradebook — sign-in, class records, report cards, localStorage
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var E = GradeEngine;
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  var esc = function (v) {
+    return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
+  var STORE_KEY = 'teacher_gradebook_v3';
+  var LEGACY_KEY = 'teacher_gradebook_v2';
+  var AUTH_KEY = 'teacher_gradebook_account_v1';
+  var SESSION_KEY = 'teacher_gradebook_session_v1';
+  var COMP_COLORS = { quiz: '#7dd3fc', assignment: '#c4b5fd', project: '#fcd34d', recitation: '#fdba74', exam: '#86efac' };
+
+  var state = E.defaultState();
+  var auth = { account: null, session: null };
+  var storageOK = true;
+  var ui = {
+    view: 'subjects', search: '', studentSearch: '', avgQuarter: 'all',
+    assessQuarter: 'q1', reportStudent: null,
+    editingStudent: null, editingAssessment: null,
+    confirmFn: null, quick: null, authMode: 'login'
+  };
+  var VIEW_IDS = {
+    subjects: 'viewSubjects', gradebook: 'viewGradebook', assessments: 'viewAssessments',
+    students: 'viewStudents', report: 'viewReport', average: 'viewAverage'
+  };
+
+  // ------------------------------------------------------------- persistence
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY) || localStorage.getItem(LEGACY_KEY);
+      if (raw) { state = E.sanitizeState(JSON.parse(raw)); return; }
+    } catch (e) { storageOK = false; }
+    state = E.defaultState();
+  }
+  // First run (and any older saved file) gets sample grades for every student
+  // in every subject and quarter, so the class record is visible right after
+  // signing in. Only blank cells are filled: anything the teacher typed stays.
+  // A one-time flag makes sure "Clear scores" is never silently undone.
+  function normalizeWholeScores() {
+    if (E.roundScores(state)) save();
+  }
+  function seedSampleGrades() {
+    if (state.sampleSeeded) return;
+    E.generateRandomGrades(state, {
+      subjectIds: state.subjects.map(function (s) { return s.id; }),
+      quarterKeys: E.QUARTERS.map(function (q) { return q.key; }),
+      min: 55, max: 98, onlyBlank: true
+    });
+    state.sampleSeeded = true;
+    save();
+  }
+  function save() {
+    state.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) {
+      if (storageOK) {
+        storageOK = false; $('#storageWarning').hidden = false;
+        toast('Storage blocked — entries last only until this tab closes.', 'error');
+      }
+      $('#saveStatus').innerHTML = '<i class="dot"></i> Could not save';
+      $('#saveStatus').classList.add('error'); return;
+    }
+    renderStatus();
+  }
+  function loadAuth() {
+    try {
+      var a = localStorage.getItem(AUTH_KEY); if (a) auth.account = JSON.parse(a);
+      var s = localStorage.getItem(SESSION_KEY); if (s) auth.session = JSON.parse(s);
+    } catch (e) { auth.account = null; auth.session = null; }
+    if (auth.account && (typeof auth.account.hash !== 'string' ||
+      typeof auth.account.salt !== 'string' || typeof auth.account.username !== 'string')) auth.account = null;
+  }
+  function persistAuth() {
+    try {
+      localStorage.setItem(AUTH_KEY, auth.account ? JSON.stringify(auth.account) : 'null');
+      localStorage.setItem(SESSION_KEY, auth.session ? JSON.stringify(auth.session) : 'null');
+    } catch (e) { /* still works for this page session */ }
+  }
+  function isAuthed() {
+    return !!(auth.account && auth.session && auth.session.username === auth.account.username &&
+      auth.session.token === E.sessionToken(auth.account));
+  }
+  function renderStatus() {
+    var el = $('#saveStatus'); el.classList.remove('error');
+    if (!storageOK) { el.innerHTML = '<i class="dot"></i> Could not save'; el.classList.add('error'); return; }
+    var t = state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+    el.innerHTML = '<i class="dot"></i> ' + (t ? 'Saved · ' + esc(t) : 'Autosave ready');
+  }
+
+  // ------------------------------------------------------------------ helpers
+  function toast(message, type) {
+    var el = document.createElement('div');
+    el.className = 'toast' + (type === 'error' ? ' error' : '');
+    var mark = document.createElement('span'); mark.textContent = type === 'error' ? '!' : '✓';
+    mark.style.cssText = 'font-weight:800;color:' + (type === 'error' ? '#ffd7de' : '#8ff0cd');
+    var txt = document.createElement('span'); txt.textContent = message;
+    el.appendChild(mark); el.appendChild(txt); $('#toast').appendChild(el);
+    setTimeout(function () { el.style.opacity = '0'; el.style.transform = 'translateX(18px)'; }, 2800);
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 3200);
+  }
+  function subjectName(id) { var s = state.subjects.find(function (x) { return x.id === id; }); return s ? s.name : 'Subject'; }
+  function quarterLabel(key) { var q = E.QUARTERS.find(function (x) { return x.key === key; }); return q ? q.label : 'Quarter'; }
+  function compLabel(key) { var c = E.COMPONENTS.find(function (x) { return x.key === key; }); return c ? c.label : key; }
+  function fmt(v) { return v === null || v === undefined ? '—' : Number(v).toFixed(0); }
+  function gradeHtml(r) {
+    if (!r || r.label === null || r.label === undefined) return '<span class="dash">—</span>';
+    var tone = !r.pass ? 'bad' : (r.gp !== null && r.gp <= 2 ? 'good' : 'mid');
+    return '<span class="grade-pill grade-' + tone + '">' + esc(r.label) + '</span>';
+  }
+  function remarkHtml(remark) {
+    return remark ? '<span class="remark ' + (remark === 'Pass' ? 'pass' : 'fail') + '">' + remark + '</span>' : '<span class="dash">—</span>';
+  }
+  function resultHtml(r) {
+    if (r.avg === null) return '<span class="dash">—</span>';
+    return '<span class="result-main">' + r.avg.toFixed(0) +
+      (r.partial ? '<span class="partial" title="Only ' + r.entered + ' of ' + r.total + ' assessments entered"></span>' : '') +
+      '</span><span class="result-sub">' + gradeHtml(r) + '</span>' +
+      '<span class="result-meta">' + Math.round(r.earned) + ' / ' + r.possible + ' pts</span>';
+  }
+  function currentSheet() { return E.getAssessments(state, state.activeSubject, state.activeQuarter); }
+  function downloadCsv(text, filename) {
+    try {
+      var url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+      var a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      return true;
+    } catch (e) { toast('Could not export: ' + e.message, 'error'); return false; }
+  }
+
+  // --------------------------------------------------------------------- auth
+  function renderAuth() {
+    var setup = !auth.account; ui.authMode = setup ? 'setup' : 'login';
+    $('#authKicker').textContent = setup ? 'FIRST TIME HERE' : 'WELCOME BACK';
+    $('#authTitle').textContent = setup ? 'Create your teacher account' : 'Sign in';
+    $('#authSub').textContent = setup
+      ? 'Set your name, a username and a password. You will use them each time you open the gradebook.'
+      : 'Enter your teacher username and password to open your subjects.';
+    $('#authNameField').hidden = !setup; $('#authConfirmField').hidden = !setup;
+    $('#authSubmitLabel').textContent = setup ? 'Create account & continue' : 'Sign in';
+    $('#authResetBtn').hidden = setup;
+    $('#authError').hidden = true; $('#authError').textContent = '';
+    $('#authUser').value = ''; $('#authPass').value = ''; $('#authName').value = ''; $('#authConfirm').value = '';
+  }
+  function showAuth() { $('#appShell').hidden = true; $('#authView').hidden = false; renderAuth(); }
+  function enterApp() {
+    $('#authView').hidden = true; $('#appShell').hidden = false;
+    var name = auth.account ? auth.account.teacherName : 'Teacher';
+    $('#teacherName').textContent = name; $('#teacherGreet').textContent = name.split(' ')[0] || name;
+    renderAll(); setView('subjects');
+  }
+
+  // ------------------------------------------------------------------ pickers
+  function renderSubjectTabs() {
+    $('#subjectTabs').innerHTML = state.subjects.map(function (s) {
+      var n = 0;
+      state.students.forEach(function (st) { if (E.resultFor(state, s.id, state.activeQuarter, st.id).avg !== null) n++; });
+      return '<button class="tab' + (s.id === state.activeSubject ? ' active' : '') + '" type="button" data-sub="' + esc(s.id) + '">' +
+        esc(s.name) + '<span class="tab-count">' + n + '</span></button>';
+    }).join('');
+  }
+  function renderQuarterTabs() {
+    $('#quarterTabs').innerHTML = E.QUARTERS.map(function (q) {
+      var n = 0;
+      state.students.forEach(function (st) { if (E.resultFor(state, state.activeSubject, q.key, st.id).avg !== null) n++; });
+      return '<button class="tab' + (q.key === state.activeQuarter ? ' active' : '') + '" type="button" data-q="' + esc(q.key) + '">' +
+        esc(q.label) + '<span class="tab-count">' + n + '</span></button>';
+    }).join('');
+  }
+
+  // ------------------------------------------------------------ subject landing
+  function renderLanding() {
+    var all = E.classStats(state, 'all', 'all');
+    var cards = [
+      ['Subjects', state.subjects.length, 'classes you teach', 'i-book'],
+      ['Students', state.students.length, 'on the roster', 'i-users'],
+      ['Quarter grades', all.graded, 'computed so far', 'i-table'],
+      ['Class average', all.average === null ? '—' : all.average.toFixed(0), 'of all quarter grades', 'i-chart']
+    ];
+    var filled = Object.keys(state.scores).length > 0;
+    $('#seedNote').hidden = !filled;
+    if (filled) $('#seedNoteText').textContent = 'Sample grades are already filled in for all ' +
+      state.students.length + ' students in every subject and quarter. Open any class record to see them — ' +
+      'every cell is editable, or use Clear scores to start from a blank sheet.';
+    $('#landingStats').innerHTML = cards.map(function (c) {
+      return '<div class="stat"><div class="stat-label"><svg><use href="#' + c[3] + '"/></svg>' + esc(c[0]) + '</div>' +
+        '<div class="stat-value">' + esc(c[1]) + '</div><div class="stat-sub">' + esc(c[2]) + '</div></div>';
+    }).join('');
+    $('#subjectCards').innerHTML = state.subjects.map(function (sub, i) {
+      var s = E.classStats(state, sub.id, 'all');
+      var qm = E.quarterMatrix(state, sub.id);
+      var items = qm.reduce(function (n, q) { return n + q.totalItems; }, 0);
+      return '<div class="subject-card" data-open-sub="' + esc(sub.id) + '">' +
+        '<div class="sc-top"><span class="sc-icon"><svg><use href="#i-book"/></svg></span><span class="sc-badge">Subject ' + (i + 1) + '</span></div>' +
+        '<h3>' + esc(sub.name) + '</h3>' +
+        '<div class="sc-metrics"><div><small>Class average</small><strong>' + fmt(s.average) + '</strong></div>' +
+        '<div><small>Quarter grades</small><strong>' + s.graded + '</strong></div></div>' +
+        '<p class="sc-note">' + qm[0].assessments + ' assessments · ' + qm[0].totalItems +
+          ' items per quarter (' + items + ' total across 4 quarters)</p>' +
+        '<div class="sc-actions"><button class="btn btn-primary btn-sm" type="button" data-open-sub="' + esc(sub.id) + '">Open class record <svg><use href="#i-arrow"/></svg></button>' +
+        '<button class="icon-btn" type="button" data-rename-sub="' + esc(sub.id) + '" title="Rename" aria-label="Rename"><svg><use href="#i-edit"/></svg></button>' +
+        '<button class="icon-btn" type="button" data-del-sub-landing="' + esc(sub.id) + '" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button></div></div>';
+    }).join('') + '<div class="subject-card add-card"><button type="button" id="addCardBtn">' +
+      '<span class="add-plus"><svg><use href="#i-plus"/></svg></span><h3>Add a subject</h3><p>Create another class or course</p></button></div>';
+  }
+  function openSubjectDashboard(id) {
+    if (!state.subjects.some(function (s) { return s.id === id; })) return;
+    state.activeSubject = id; ui.assessQuarter = state.activeQuarter;
+    save(); setView('gradebook'); renderAll();
+  }
+
+  // --------------------------------------------------------------- gradebook
+  function renderHead() {
+    var list = currentSheet();
+    var cols = list.map(function (a) {
+      return '<th class="score-col" data-comp="' + esc(a.component) + '">' +
+        '<span class="th-name">' + esc(a.name) + '</span>' +
+        '<span class="th-items">' + a.items + ' items</span>' +
+        '<span class="th-cat">' + esc(compLabel(a.component)) + '</span></th>';
+    }).join('');
+    $('#tableHead').innerHTML = '<tr><th class="sticky col-id">Student ID</th>' +
+      '<th class="sticky col-name">Student Name</th><th class="sticky col-sec">Section</th>' + cols +
+      '<th class="result-col">Quarter Grade</th><th>Remark</th><th>Actions</th></tr>';
+  }
+  function nameButton(st) {
+    return '<button class="name-edit" type="button" data-action="rename" data-stu="' + esc(st.id) + '" ' +
+      'title="Click to edit this student\'s name">' + esc(st.name) + '<svg><use href="#i-edit"/></svg></button>';
+  }
+  function gradeRow(st, i) {
+    var list = currentSheet();
+    var r = E.resultFor(state, state.activeSubject, state.activeQuarter, st.id);
+    var cells = list.map(function (a) {
+      var v = state.scores[E.scoreKey(state.activeSubject, state.activeQuarter, st.id, a.id)];
+      return '<td data-comp="' + esc(a.component) + '"><div class="cell-wrap">' +
+        '<input class="cell" type="number" min="0" max="' + a.items + '" step="1" inputmode="numeric" ' +
+        'data-stu="' + esc(st.id) + '" data-a="' + esc(a.id) + '" data-items="' + a.items + '" ' +
+        'value="' + (typeof v === 'number' ? v : '') + '" placeholder="—" ' +
+        'aria-label="' + esc(a.name) + ', ' + a.items + ' items, for ' + esc(st.name) + '">' +
+        '<span class="cell-max">/' + a.items + '</span></div></td>';
+    }).join('');
+    return '<tr data-stu="' + esc(st.id) + '">' +
+      '<td class="sticky col-id"><span class="row-num">' + (i + 1) + '</span>' + esc(st.no) + '</td>' +
+      '<td class="sticky col-name">' + nameButton(st) + '</td>' +
+      '<td class="sticky col-sec">' + esc(st.section || '—') + '</td>' + cells +
+      '<td class="result-cell">' + resultHtml(r) + '</td>' +
+      '<td class="remark-cell">' + remarkHtml(r.remark) + '</td>' +
+      '<td><div class="row-actions"><button type="button" data-action="edit" data-stu="' + esc(st.id) + '" title="Edit all details" aria-label="Edit all details"><svg><use href="#i-edit"/></svg></button>' +
+      '<button type="button" class="del" data-action="del" data-stu="' + esc(st.id) + '" title="Delete student" aria-label="Delete student"><svg><use href="#i-trash"/></svg></button></div></td></tr>';
+  }
+  function renderGradeBody() {
+    var q = ui.search.trim().toLowerCase();
+    var rows = state.students.filter(function (st) {
+      return !q || st.no.toLowerCase().indexOf(q) !== -1 || st.name.toLowerCase().indexOf(q) !== -1 ||
+        String(st.section || '').toLowerCase().indexOf(q) !== -1;
+    });
+    if (!rows.length) {
+      $('#tableBody').innerHTML = '<tr class="empty-row"><td colspan="' + (6 + currentSheet().length) + '">' +
+        (state.students.length ? 'No student matches “' + esc(ui.search) + '”.' : 'No students yet — click “Add student”.') + '</td></tr>';
+    } else $('#tableBody').innerHTML = rows.map(function (st, i) { return gradeRow(st, i); }).join('');
+  }
+  function renderFoot() {
+    var list = currentSheet();
+    var stats = E.assessmentStats(state, state.activeSubject, state.activeQuarter);
+    var avgs = [];
+    state.students.forEach(function (st) {
+      var r = E.resultFor(state, state.activeSubject, state.activeQuarter, st.id);
+      if (r.avg !== null) avgs.push(r.avg);
+    });
+    var mean = avgs.length ? avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length : null;
+    $('#tableFoot').innerHTML = '<tr><td colspan="3">Class average · ' + esc(subjectName(state.activeSubject)) + ' · ' + esc(quarterLabel(state.activeQuarter)) + '</td>' +
+      stats.map(function (a) { return '<td>' + (a.avgScore === null ? '—' : a.avgScore.toFixed(0)) + '</td>'; }).join('') +
+      '<td class="result-cell"><span class="result-main">' + (mean === null ? '—' : mean.toFixed(0)) + '</span>' +
+      '<span class="result-meta">class average</span></td><td>—</td><td>—</td></tr>';
+  }
+  function renderSheetInfo() {
+    var s = E.classStats(state, state.activeSubject, state.activeQuarter);
+    var pct = state.students.length ? Math.round(s.graded / state.students.length * 100) : 0;
+    var shown = ui.search.trim() ? state.students.filter(function (st) {
+      var q = ui.search.trim().toLowerCase();
+      return st.no.toLowerCase().indexOf(q) !== -1 || st.name.toLowerCase().indexOf(q) !== -1;
+    }).length : state.students.length;
+    $('#sheetInfo').innerHTML = 'Showing <strong>' + shown + '</strong> of ' + state.students.length +
+      ' students · <strong>' + s.graded + '</strong> graded <span class="progress"><i style="width:' + pct + '%"></i></span>';
+    var scale = state.settings.scale === 'college' ? 'College 1.00–5.00' : 'Letters A–F';
+    $('#scaleLegend').textContent = 'Grade scale: ' + scale + ' · Passing = ' + state.settings.passing;
+  }
+  function renderItemStrip() {
+    var s = E.sheetSummary(state, state.activeSubject, state.activeQuarter);
+    $('#itemStrip').innerHTML = s.perComponent.map(function (c) {
+      return '<span class="item-chip"><i class="swatch" style="background:' + COMP_COLORS[c.key] + '"></i>' +
+        esc(c.label) + ': <b>' + c.count + '</b> × <b>' + c.totalItems + '</b> items' +
+        (c.classPct === null ? '' : ' · avg <b>' + c.classPct.toFixed(0) + '%</b>') + '</span>';
+    }).join('') + '<span class="item-chip total"><svg style="width:14px;height:14px"><use href="#i-list"/></svg> Total: <b>' +
+      s.assessments + '</b> assessments · <b>' + s.totalItems + '</b> items</span>';
+  }
+  function renderFormula() {
+    var f = E.FORMULAS.find(function (x) { return x.id === state.settings.formula; });
+    $('#formulaChip').textContent = f.label;
+    $('#formulaExplain').textContent = f.desc + ' Each score is divided by its number of items first. Blank assessments are skipped. ' +
+      'Quarter grades are averaged into the Final Grade, and subject final grades are averaged into the General Average on the report card.';
+    var example = state.students.find(function (st) {
+      return E.resultFor(state, state.activeSubject, state.activeQuarter, st.id).avg !== null;
+    });
+    var steps = '';
+    if (example) {
+      var r = E.resultFor(state, state.activeSubject, state.activeQuarter, example.id);
+      steps = E.COMPONENTS.map(function (c) {
+        var p = r.categoryPcts[c.key];
+        return '<div class="formula-step"><small>' + esc(c.label) + '</small><b>' + (p === undefined ? '—' : p.toFixed(0) + '%') + '</b>' +
+          '<span>' + (p === undefined ? 'no scores' : 'of ' + r.components[c.key].items + ' items') + '</span></div>';
+      }).join('') + '<div class="formula-step"><small>Quarter grade</small><b>' + r.avg.toFixed(0) + '</b><span>' + esc(r.label) + ' · ' + Math.round(r.earned) + '/' + r.possible + ' points</span></div>';
+    } else {
+      var s = E.sheetSummary(state, state.activeSubject, state.activeQuarter);
+      steps = '<div class="formula-step"><small>Assessments</small><b>' + s.assessments + '</b><span>columns in this class record</span></div>' +
+        '<div class="formula-step"><small>Total items</small><b>' + s.totalItems + '</b><span>maximum score this quarter</span></div>' +
+        '<div class="formula-step"><small>Example</small><b>—</b><span>enter scores to see a worked example for a student</span></div>';
+    }
+    $('#formulaSteps').innerHTML = steps;
+  }
+  function updateRow(tr) {
+    if (!tr || !tr.dataset.stu) return;
+    var r = E.resultFor(state, state.activeSubject, state.activeQuarter, tr.dataset.stu);
+    var result = $('.result-cell', tr); if (result) result.innerHTML = resultHtml(r);
+    var remark = $('.remark-cell', tr); if (remark) remark.innerHTML = remarkHtml(r.remark);
+  }
+  function refreshAfterGrade(tr) {
+    if (tr) updateRow(tr);
+    renderFoot(); renderSheetInfo(); renderItemStrip(); renderFormula();
+    renderSubjectTabs(); renderQuarterTabs();
+    renderAverage(); renderLanding(); renderAssessments(); renderReport();
+  }
+
+  // ------------------------------------------------------------- assessments
+  // The Assessments page always follows the subject currently open in the
+  // gradebook, so the class record and its item counts never disagree.
+  function selectedAssessSheet() {
+    var q = E.QUARTERS.some(function (x) { return x.key === ui.assessQuarter; }) ? ui.assessQuarter : 'q1';
+    return { sub: state.activeSubject, q: q };
+  }
+  function renderAssessments() {
+    var sh = selectedAssessSheet();
+    $('#assessSubject').innerHTML = state.subjects.map(function (s) {
+      return '<option value="' + esc(s.id) + '"' + (s.id === sh.sub ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+    }).join('');
+    $('#assessQuarter').value = sh.q;
+    $('#newAssessComp').innerHTML = E.COMPONENTS.map(function (c) {
+      return '<option value="' + esc(c.key) + '">' + esc(c.label) + '</option>';
+    }).join('');
+    $('#editAssessComp').innerHTML = $('#newAssessComp').innerHTML;
+    $('#quarterOverviewSubject').textContent = subjectName(sh.sub);
+
+    var sum = E.sheetSummary(state, sh.sub, sh.q);
+    var cs = E.classStats(state, sh.sub, sh.q);
+    var cards = [
+      ['Assessments', sum.assessments, 'columns in this quarter', 'i-list'],
+      ['Total items', sum.totalItems, 'maximum raw score', 'i-table'],
+      ['Categories', E.COMPONENTS.length, 'quiz, assignment, project, recitation, exam', 'i-book'],
+      ['Class average', cs.average === null ? '—' : cs.average.toFixed(0), 'this quarter', 'i-chart']
+    ];
+    $('#assessStats').innerHTML = cards.map(function (c) {
+      return '<div class="stat"><div class="stat-label"><svg><use href="#' + c[3] + '"/></svg>' + esc(c[0]) + '</div>' +
+        '<div class="stat-value">' + esc(c[1]) + '</div><div class="stat-sub">' + esc(c[2]) + '</div></div>';
+    }).join('');
+
+    var stats = E.assessmentStats(state, sh.sub, sh.q);
+    $('#assessmentTable').innerHTML = '<thead><tr><th>#</th><th>Category</th><th>Assessment</th><th>Items</th>' +
+      '<th>Class average</th><th>Scores entered</th><th class="actions-col">Actions</th></tr></thead><tbody>' +
+      (stats.length ? stats.map(function (a, i) {
+        return '<tr><td class="mono">' + (i + 1) + '</td><td><span class="tag">' + esc(compLabel(a.component)) + '</span></td>' +
+          '<td class="name">' + esc(a.name) + '</td><td class="items-cell">' + a.items + '</td>' +
+          '<td class="num">' + (a.avgScore === null ? '—' : a.avgScore.toFixed(0) + ' / ' + a.items + ' (' + a.avgPct.toFixed(0) + '%)') + '</td>' +
+          '<td>' + a.entered + ' / ' + state.students.length + '</td>' +
+          '<td class="actions-col"><div class="row-actions" style="justify-content:flex-end">' +
+          '<button type="button" data-edit-assess="' + esc(a.id) + '" title="Edit" aria-label="Edit"><svg><use href="#i-edit"/></svg></button>' +
+          '<button type="button" class="del" data-del-assess="' + esc(a.id) + '" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button>' +
+          '</div></td></tr>';
+      }).join('') : '<tr class="empty-row"><td colspan="7">No assessments yet — add one above.</td></tr>') + '</tbody>';
+
+    var qm = E.quarterMatrix(state, sh.sub);
+    $('#quarterOverview').innerHTML = '<thead><tr><th>Quarter</th><th>Assessments</th><th>Total items</th>' +
+      '<th>Class average</th><th>Students graded</th><th class="actions-col"></th></tr></thead><tbody>' +
+      qm.map(function (q) {
+        return '<tr' + (q.key === sh.q ? ' class="current-q"' : '') + '><td class="name">' + esc(q.label) + '</td>' +
+          '<td>' + q.assessments + '</td><td class="items-cell">' + q.totalItems + '</td>' +
+          '<td class="num">' + fmt(q.average) + '</td><td>' + q.graded + ' / ' + state.students.length + '</td>' +
+          '<td class="actions-col"><button class="btn btn-ghost btn-sm" type="button" data-assess-q="' + esc(q.key) + '">View</button></td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  // ----------------------------------------------------------------- students
+  function renderStudents() {
+    var q = ui.studentSearch.trim().toLowerCase();
+    var rows = state.students.filter(function (st) {
+      return !q || st.no.toLowerCase().indexOf(q) !== -1 || st.name.toLowerCase().indexOf(q) !== -1 ||
+        String(st.section || '').toLowerCase().indexOf(q) !== -1;
+    });
+    $('#studentBody').innerHTML = rows.length ? rows.map(function (st) {
+      return '<tr><td class="mono">' + esc(st.no) + '</td><td class="name">' + nameButton(st) + '</td>' +
+        '<td>' + esc(st.section || '—') + '</td><td class="actions-col"><div class="row-actions" style="justify-content:flex-end">' +
+        '<button type="button" data-action="report" data-stu="' + esc(st.id) + '" title="Report card" aria-label="Report card"><svg><use href="#i-card"/></svg></button>' +
+        '<button type="button" data-action="edit" data-stu="' + esc(st.id) + '" title="Edit all details" aria-label="Edit all details"><svg><use href="#i-edit"/></svg></button>' +
+        '<button type="button" class="del" data-action="del" data-stu="' + esc(st.id) + '" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button></div></td></tr>';
+    }).join('') : '<tr class="empty-row"><td colspan="4">' +
+      (state.students.length ? 'No student matches “' + esc(ui.studentSearch) + '”.' : 'No students yet — click “Add student”.') + '</td></tr>';
+    $('#studentCount').textContent = state.students.length + ' student' + (state.students.length === 1 ? '' : 's') + ' on the roster';
+  }
+
+  // --------------------------------------------------------------- report card
+  function renderReport() {
+    var id = state.students.some(function (s) { return s.id === ui.reportStudent; }) ? ui.reportStudent : (state.students[0] ? state.students[0].id : null);
+    ui.reportStudent = id;
+    $('#reportStudent').innerHTML = state.students.map(function (s) {
+      return '<option value="' + esc(s.id) + '"' + (s.id === id ? ' selected' : '') + '>' + esc(s.no) + ' — ' + esc(s.name) + '</option>';
+    }).join('') || '<option value="">No students</option>';
+    var st = state.students.find(function (s) { return s.id === id; });
+    if (!st) {
+      $('#reportMeta').textContent = '';
+      $('#reportSheet').innerHTML = '<div class="dist-empty">Add a student to see report cards.</div>';
+      return;
+    }
+    var rc = E.reportCard(state, id);
+    var scale = state.settings.scale === 'college' ? 'College grade point (1.00 – 5.00)' : 'Letter grades (A – F)';
+    $('#reportMeta').textContent = scale + ' · Passing = ' + state.settings.passing;
+    var head = '<div class="report-head"><div><h2>' + esc(st.name) + '</h2>' +
+      '<p>Student ID ' + esc(st.no) + ' · Section ' + esc(st.section || '—') + ' · ' + state.subjects.length + ' subjects · 4 quarters</p></div>' +
+      '<div class="report-general"><small>General Average</small><strong>' + (rc.general === null ? '—' : rc.general.toFixed(0)) + '</strong>' +
+      '<span>' + (rc.label ? esc(rc.label) + ' · ' + esc(rc.remark) : 'No grades yet') + '</span></div></div>';
+    var table = '<table class="list-table"><thead><tr><th>Subject</th>' +
+      E.QUARTERS.map(function (q) { return '<th>' + esc(q.label) + '</th>'; }).join('') +
+      '<th>Final Grade</th><th>Grade</th><th>Remark</th></tr></thead><tbody>' +
+      rc.rows.map(function (row) {
+        return '<tr><td class="name">' + esc(row.name) + '</td>' +
+          E.QUARTERS.map(function (q) { return '<td class="num">' + fmt(row.quarters[q.key].avg) + '</td>'; }).join('') +
+          '<td class="num">' + fmt(row.final) + '</td><td>' + gradeHtml(row) + '</td><td>' + remarkHtml(row.remark) + '</td></tr>';
+      }).join('') + '</tbody><tfoot><tr><td>General Average</td>' +
+      E.QUARTERS.map(function (q) {
+        var vals = [];
+        state.subjects.forEach(function (s) { var r = E.resultFor(state, s.id, q.key, id); if (r.avg !== null) vals.push(r.avg); });
+        return '<td class="num">' + (vals.length ? (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(0) : '—') + '</td>';
+      }).join('') + '<td class="num">' + (rc.general === null ? '—' : rc.general.toFixed(0)) + '</td>' +
+      '<td>' + gradeHtml(rc) + '</td><td>' + remarkHtml(rc.remark) + '</td></tr></tfoot></table>';
+    $('#reportSheet').innerHTML = head + table;
+  }
+
+  // ------------------------------------------------------------ class average
+  function renderAverage() {
+    var s = E.classStats(state, 'all', ui.avgQuarter);
+    $('#avgSubjectNames').textContent = state.subjects.map(function (x) { return x.name; }).join(' · ');
+    var cards = [
+      ['Quarter grades', s.graded, 'across ' + state.subjects.length + ' subjects', 'i-table'],
+      ['Class average', s.average === null ? '—' : s.average.toFixed(0), 'of all quarter grades', 'i-chart'],
+      ['Highest grade', s.highest === null ? '—' : s.highest.toFixed(0), 'top quarter grade', 'i-trophy'],
+      ['Pass rate', s.passRate === null ? '—' : s.passRate + '%', 'passing mark ' + state.settings.passing, 'i-shield']
+    ];
+    $('#avgStats').innerHTML = cards.map(function (c) {
+      return '<div class="stat"><div class="stat-label"><svg><use href="#' + c[3] + '"/></svg>' + esc(c[0]) + '</div>' +
+        '<div class="stat-value">' + esc(c[1]) + '</div><div class="stat-sub">' + esc(c[2]) + '</div></div>';
+    }).join('');
+
+    var qKeys = ui.avgQuarter === 'all' ? E.QUARTERS.map(function (q) { return q.key; }) : [ui.avgQuarter];
+    $('#subjectMatrix').innerHTML = '<thead><tr><th>Subject</th>' + qKeys.map(function (k) { return '<th>' + esc(quarterLabel(k)) + '</th>'; }).join('') +
+      '<th>Overall</th><th>Pass rate</th><th>Grades</th></tr></thead><tbody>' +
+      state.subjects.map(function (sub) {
+        var all = E.classStats(state, sub.id, ui.avgQuarter);
+        return '<tr><td class="name">' + esc(sub.name) + '</td>' +
+          qKeys.map(function (k) { return '<td class="num">' + fmt(E.classStats(state, sub.id, k).average) + '</td>'; }).join('') +
+          '<td class="num">' + fmt(all.average) + '</td><td>' + (all.passRate === null ? '—' : all.passRate + '%') + '</td><td>' + all.graded + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    var labels = E.bands(state).map(function (b) { return b.label; });
+    var max = Math.max.apply(null, [1].concat(labels.map(function (l) { return s.distribution[l] || 0; })));
+    $('#distBars').innerHTML = s.graded ? labels.map(function (l) {
+      var n = s.distribution[l] || 0;
+      return '<div class="dist-item"><span class="dist-letter">' + esc(l) + '</span>' +
+        '<span class="dist-track"><span class="dist-fill" style="display:block;width:' + (n ? Math.max(4, n / max * 100) : 0) + '%"></span></span>' +
+        '<span class="dist-count">' + n + '</span></div>';
+    }).join('') : '<div class="dist-empty">No grades yet. Enter scores in the Gradebook.</div>';
+
+    $('#categoryMatrix').innerHTML = '<thead><tr><th>Category</th><th>Class average %</th><th>Grades counted</th></tr></thead><tbody>' +
+      s.perComponent.map(function (c) {
+        return '<tr><td class="name">' + esc(c.label) + '</td><td class="num">' + fmt(c.average) + '</td><td>' + c.graded + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    var stats = E.assessmentStats(state, state.activeSubject, state.activeQuarter);
+    $('#breakdownLabel').textContent = subjectName(state.activeSubject) + ' · ' + quarterLabel(state.activeQuarter);
+    $('#assessmentBreakdown').innerHTML = '<thead><tr><th>Assessment</th><th>Category</th><th>Items</th><th>Class avg</th><th>%</th><th>Highest</th></tr></thead><tbody>' +
+      (stats.length ? stats.map(function (a) {
+        return '<tr><td class="name">' + esc(a.name) + '</td><td><span class="tag">' + esc(compLabel(a.component)) + '</span></td>' +
+          '<td class="items-cell">' + a.items + '</td><td class="num">' + fmt(a.avgScore) + '</td>' +
+          '<td class="num">' + (a.avgPct === null ? '—' : a.avgPct.toFixed(0) + '%') + '</td><td>' + fmt(a.highest) + '</td></tr>';
+      }).join('') : '<tr class="empty-row"><td colspan="6">No assessments in this sheet.</td></tr>') + '</tbody>';
+
+    var ranked = s.perStudent.filter(function (p) { return p.average !== null; });
+    $('#rankingTable').innerHTML = '<thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Section</th><th>Average</th><th>Grade</th><th>Remark</th><th>Grades</th></tr></thead><tbody>' +
+      (ranked.length ? ranked.map(function (p, i) {
+        return '<tr><td><span class="rank' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span></td>' +
+          '<td class="mono">' + esc(p.no) + '</td><td class="name">' + esc(p.name) + '</td>' +
+          '<td>' + esc(p.section || '—') + '</td><td class="num">' + fmt(p.average) + '</td>' +
+          '<td>' + gradeHtml(p) + '</td><td>' + remarkHtml(p.remark) + '</td><td>' + p.entries + '</td></tr>';
+      }).join('') : '<tr class="empty-row"><td colspan="8">No grades entered yet for this selection.</td></tr>') + '</tbody>';
+  }
+
+  // Small accessibility pass after each render: column headers need a scope,
+  // and icon-only buttons need a name. Both are no-ops in non-DOM test hosts.
+  function applyA11y() {
+    try {
+      $$('thead th').forEach(function (th) { if (!th.getAttribute('scope')) th.setAttribute('scope', 'col'); });
+      $$('button[title]').forEach(function (b) {
+        if (!b.getAttribute('aria-label') && !(b.textContent || '').trim()) {
+          b.setAttribute('aria-label', b.getAttribute('title'));
+        }
+      });
+    } catch (e) { /* cosmetic only */ }
+  }
+  // Measure the real top bar so a wrapped mobile bar never covers the sticky
+  // table header. CSS keeps a safe fallback for browsers without layout data.
+  function syncStickyOffset() {
+    try {
+      var bar = document.querySelector('.topbar');
+      if (!bar || typeof bar.getBoundingClientRect !== 'function') return;
+      var h = Math.round(bar.getBoundingClientRect().height);
+      if (h > 0 && document.documentElement && document.documentElement.style) {
+        document.documentElement.style.setProperty('--sticky-top', h + 'px');
+      }
+    } catch (e) { /* CSS fallback */ }
+  }
+  function renderAll() {
+    renderSubjectTabs(); renderQuarterTabs(); renderHead(); renderGradeBody();
+    renderFoot(); renderSheetInfo(); renderItemStrip(); renderFormula();
+    renderLanding(); renderAssessments(); renderStudents(); renderReport();
+    renderAverage(); renderStatus();
+    $('#currentSubjectLabel').textContent = subjectName(state.activeSubject);
+    $('#breadcrumb').innerHTML = 'Subjects <span class="sep">/</span> <b>' + esc(subjectName(state.activeSubject)) +
+      '</b> <span class="sep">/</span> ' + esc(quarterLabel(state.activeQuarter)) +
+      ' <span class="sep">/</span> Class record';
+    applyA11y(); syncStickyOffset();
+  }
+
+  // -------------------------------------------------------------------- views
+  function setView(v) {
+    if (!VIEW_IDS[v]) return;
+    ui.view = v;
+    Object.keys(VIEW_IDS).forEach(function (name) { $('#' + VIEW_IDS[name]).hidden = name !== v; });
+    $$('.nav-tab').forEach(function (b) {
+      var active = b.getAttribute('data-view') === v;
+      b.classList.toggle('active', active);
+      if (active) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    if (v === 'assessments') renderAssessments();
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) { /* ignore */ }
+  }
+
+  // ------------------------------------------------------------------- modals
+  var lastFocus = null;
+  function openModal(id) {
+    var modal = $('#' + id);
+    try { lastFocus = document.activeElement || null; } catch (e) { lastFocus = null; }
+    modal.hidden = false;
+    try {
+      var first = modal.querySelector('input:not([type="hidden"]), select, button');
+      if (first && typeof first.focus === 'function') first.focus();
+    } catch (e) { /* focus is a convenience */ }
+  }
+  function closeModal(id) {
+    $('#' + id).hidden = true;
+    if (id === 'confirmModal') ui.confirmFn = null;
+    try { if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus(); } catch (e) { /* ignore */ }
+  }
+  function openConfirm(title, text, fn, label) {
+    $('#confirmTitle').textContent = title; $('#confirmText').textContent = text;
+    $('#confirmOk').textContent = label || 'Confirm'; ui.confirmFn = fn; openModal('confirmModal');
+  }
+  function openStudentModal(id) {
+    ui.editingStudent = id || null;
+    var st = id ? state.students.find(function (s) { return s.id === id; }) : null;
+    $('#studentModalTitle').textContent = st ? 'Edit student' : 'Add student';
+    $('#stuNo').value = st ? st.no : ''; $('#stuName').value = st ? st.name : '';
+    $('#stuSection').value = st ? (st.section || '') : E.DEFAULT_SECTION;
+    openModal('studentModal');
+  }
+  function openQuick(mode, id, value, current) {
+    ui.quick = { mode: mode, id: id || null };
+    var copy = {
+      'add-subject': ['Add a subject', 'Subject name', 'Give the new subject a clear name, e.g. "Web Development".'],
+      'rename-subject': ['Rename subject', 'Subject name', 'Changing the name keeps all of its grades. Current: ' + (current || '')],
+      'rename-student': ['Edit student name', 'Full name', 'Only the name changes — the student ID and grades stay. Current: ' + (current || '')]
+    }[mode];
+    $('#quickTitle').textContent = copy[0]; $('#quickLabel').textContent = copy[1]; $('#quickHint').textContent = copy[2];
+    $('#quickInput').value = value || ''; $('#quickError').hidden = true; openModal('quickModal');
+  }
+  function openAssessmentModal(id) {
+    var sh = selectedAssessSheet();
+    var a = E.getAssessments(state, sh.sub, sh.q).find(function (x) { return x.id === id; });
+    if (!a) return;
+    ui.editingAssessment = id;
+    $('#assessmentModalTitle').textContent = 'Edit ' + a.name;
+    $('#editAssessName').value = a.name; $('#editAssessItems').value = a.items;
+    $('#editAssessComp').value = a.component; $('#assessmentEditError').hidden = true;
+    openModal('assessmentModal');
+  }
+  function renderSubjectList() {
+    $('#subjectList').innerHTML = state.subjects.map(function (s, i) {
+      return '<div class="subject-row"><span class="idx">' + (i + 1) + '</span>' +
+        '<input class="subject-name" data-sub-id="' + esc(s.id) + '" maxlength="60" value="' + esc(s.name) + '">' +
+        '<button class="icon-btn" type="button" data-del-sub="' + esc(s.id) + '" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button></div>';
+    }).join('');
+  }
+  function openSubjectModal() { renderSubjectList(); $('#newSubjectName').value = ''; openModal('subjectModal'); }
+
+  // ------------------------------------------------------- random grade filler
+  function randomOptions() {
+    var scope = $('#randScope').value || 'sheet';
+    var subjectIds, quarterKeys;
+    if (scope === 'all') {
+      subjectIds = state.subjects.map(function (s) { return s.id; });
+      quarterKeys = E.QUARTERS.map(function (q) { return q.key; });
+    } else if (scope === 'quarters') {
+      subjectIds = [state.activeSubject];
+      quarterKeys = E.QUARTERS.map(function (q) { return q.key; });
+    } else {
+      subjectIds = [state.activeSubject]; quarterKeys = [state.activeQuarter];
+    }
+    var range = $('#randRange').value || 'typical';
+    var r = range === 'wide' ? { min: 30, max: 100 }
+      : range === 'high' ? { min: 75, max: 100 } : { min: 55, max: 98 };
+    var onlyBlank = ($('#randMode').value || 'blank') !== 'replace';
+    return { subjectIds: subjectIds, quarterKeys: quarterKeys,
+      min: r.min, max: r.max, onlyBlank: onlyBlank, sheets: subjectIds.length * quarterKeys.length };
+  }
+  function updateRandomPreview() {
+    var o = randomOptions();
+    var n = E.countFillableCells(state, o.subjectIds, o.quarterKeys, o.onlyBlank);
+    var el = $('#randPreview');
+    el.classList.toggle('warn', !o.onlyBlank);
+    el.textContent = (o.onlyBlank ? 'Will fill ' : 'Will replace ') + n + ' score ' + (n === 1 ? 'cell' : 'cells') +
+      ' for all ' + state.students.length + ' students across ' + o.sheets + ' class ' + (o.sheets === 1 ? 'record' : 'records') + '. ' +
+      (o.onlyBlank ? 'Grades you already typed are kept.' : 'All existing scores in that selection will be overwritten.') +
+      ' Every cell stays editable.';
+  }
+  function openRandomModal() {
+    $('#randScope').value = 'sheet'; $('#randRange').value = 'typical'; $('#randMode').value = 'blank';
+    $('#randStudentCount').textContent = state.students.length;
+    updateRandomPreview(); openModal('randomModal');
+  }
+
+  // ------------------------------------------------------------ settings modal
+  function openSettings() {
+    $('#settingFormula').innerHTML = E.FORMULAS.map(function (f) {
+      return '<option value="' + f.id + '">' + esc(f.label) + '</option>';
+    }).join('');
+    $('#settingFormula').value = state.settings.formula;
+    $('#settingScale').value = state.settings.scale;
+    $('#settingPassing').value = state.settings.passing;
+    $('#wWW').value = state.settings.weights.WW;
+    $('#wPT').value = state.settings.weights.PT;
+    $('#wQA').value = state.settings.weights.QA;
+    $('#settingsError').hidden = true;
+    updateSettingsUI(); openModal('settingsModal');
+  }
+  function updateSettingsUI() {
+    var f = E.FORMULAS.find(function (x) { return x.id === $('#settingFormula').value; });
+    $('#formulaDesc').textContent = f ? f.desc : '';
+    var deped = $('#settingFormula').value === 'deped';
+    $('#weightsRow').hidden = !deped;
+    var w = ['wWW', 'wPT', 'wQA'].map(function (id) { return Number($('#' + id).value) || 0; });
+    var total = w.reduce(function (a, b) { return a + b; }, 0);
+    var el = $('#weightsTotal'); el.textContent = 'Total: ' + total + '%' + (total === 100 ? ' ✓' : ' (must be 100%)');
+    el.classList.toggle('bad', total !== 100);
+    var scale = $('#settingScale').value;
+    $('#scaleDesc').textContent = scale === 'college'
+      ? '1.00 (97–100), 1.25 (94–96), 1.50 (91–93), 1.75 (88–90), 2.00 (85–87), 2.25 (82–84), 2.50 (79–81), 2.75 (76–78), 3.00 (75), 5.00 (below 75).'
+      : 'A (90–100), B (80–89), C (70–79), D (60–69), F (below 60).';
+  }
+
+  // ------------------------------------------------------------------- events
+  function bind() {
+    $('#authForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var err = $('#authError');
+      function fail(m) { err.textContent = m; err.hidden = false; }
+      err.hidden = true;
+      var user = $('#authUser').value.trim(), pass = $('#authPass').value;
+      if (!user || !pass) { fail('Enter a username and password.'); return; }
+      if (ui.authMode === 'setup') {
+        var name = $('#authName').value.trim();
+        if (!name) { fail('Enter your teacher name.'); return; }
+        if (pass.length < 4) { fail('Use at least 4 characters for the password.'); return; }
+        if (pass !== $('#authConfirm').value) { fail('The passwords do not match.'); return; }
+        var acct = E.createAccount(name, user, pass);
+        if (!acct) { fail('Could not create the account.'); return; }
+        auth.account = acct; auth.session = { username: acct.username, token: E.sessionToken(acct) };
+        persistAuth(); enterApp();
+      } else {
+        if (!E.checkPassword(auth.account, user, pass)) { fail('Incorrect username or password.'); return; }
+        auth.session = { username: auth.account.username, token: E.sessionToken(auth.account) };
+        persistAuth(); enterApp();
+      }
+    });
+    $('#authResetBtn').addEventListener('click', function () {
+      openConfirm('Reset teacher account?',
+        'The username and password will be erased so you can create a new one. All subjects, students and grades are kept.',
+        function () { auth.account = null; auth.session = null; persistAuth(); renderAuth(); toast('Account reset — create a new one below.'); }, 'Reset account');
+    });
+    $('#logoutBtn').addEventListener('click', function () { auth.session = null; persistAuth(); showAuth(); toast('Signed out.'); });
+
+    $$('.nav-tab').forEach(function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-view')); }); });
+    $('#backToSubjects').addEventListener('click', function () { setView('subjects'); renderLanding(); });
+    $('#goAssessmentsBtn').addEventListener('click', function () {
+      ui.assessQuarter = state.activeQuarter;
+      renderAssessments(); setView('assessments');
+    });
+    $('#settingsBtn').addEventListener('click', openSettings);
+    ['#settingFormula', '#wWW', '#wPT', '#wQA', '#settingScale'].forEach(function (id) {
+      $(id).addEventListener('input', updateSettingsUI); $(id).addEventListener('change', updateSettingsUI);
+    });
+    $('#settingScale').addEventListener('change', function () {
+      $('#settingPassing').value = $('#settingScale').value === 'college' ? 75 : 60;
+    });
+    $('#saveSettingsBtn').addEventListener('click', function () {
+      var err = $('#settingsError');
+      function fail(m) { err.textContent = m; err.hidden = false; }
+      err.hidden = true;
+      var formula = $('#settingFormula').value, scale = $('#settingScale').value;
+      var passing = Number($('#settingPassing').value);
+      if (!Number.isFinite(passing) || passing < 0 || passing > 100) { fail('Passing mark must be 0–100.'); return; }
+      var w = { WW: Number($('#wWW').value), PT: Number($('#wPT').value), QA: Number($('#wQA').value) };
+      if (formula === 'deped' && (!Number.isFinite(w.WW + w.PT + w.QA) || w.WW + w.PT + w.QA !== 100 ||
+          w.WW < 0 || w.PT < 0 || w.QA < 0)) { fail('DepEd weights must add up to exactly 100%.'); return; }
+      state.settings = { formula: formula, scale: scale, passing: passing, weights: w };
+      save(); closeModal('settingsModal'); renderAll(); toast('Grading settings saved — all grades recalculated.');
+    });
+
+    // Landing
+    $('#landingAddBtn').addEventListener('click', function () { openQuick('add-subject'); });
+    $('#landingManageBtn').addEventListener('click', openSubjectModal);
+    $('#subjectCards').addEventListener('click', function (e) {
+      var t = e.target;
+      if (t.closest && t.closest('#addCardBtn')) { openQuick('add-subject'); return; }
+      var ren = t.closest ? t.closest('[data-rename-sub]') : null;
+      if (ren) { var i1 = ren.getAttribute('data-rename-sub'); openQuick('rename-subject', i1, subjectName(i1), subjectName(i1)); return; }
+      var del = t.closest ? t.closest('[data-del-sub-landing]') : null;
+      if (del) {
+        var i2 = del.getAttribute('data-del-sub-landing');
+        if (state.subjects.length <= 1) { toast('Keep at least one subject.', 'error'); return; }
+        openConfirm('Delete ' + subjectName(i2) + '?', 'The subject and all of its assessments and grades in every quarter will be removed.',
+          function () { E.removeSubject(state, i2); save(); renderAll(); toast('Subject removed.'); }, 'Delete subject');
+        return;
+      }
+      var open = t.closest ? t.closest('[data-open-sub]') : null;
+      if (open) openSubjectDashboard(open.getAttribute('data-open-sub'));
+    });
+
+    // Gradebook pickers + toolbar
+    $('#subjectTabs').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-sub]') : null; if (!b) return;
+      state.activeSubject = b.getAttribute('data-sub'); save(); renderAll();
+    });
+    $('#quarterTabs').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-q]') : null; if (!b) return;
+      state.activeQuarter = b.getAttribute('data-q'); ui.assessQuarter = state.activeQuarter;
+      save(); renderAll();
+    });
+    $('#manageSubjectsBtn').addEventListener('click', openSubjectModal);
+    $('#searchInput').addEventListener('input', function (e) { ui.search = e.target.value; renderGradeBody(); });
+    $('#studentSearch').addEventListener('input', function (e) { ui.studentSearch = e.target.value; renderStudents(); });
+    $('#avgQuarter').addEventListener('change', function (e) { ui.avgQuarter = e.target.value; renderAverage(); });
+    $('#addStudentBtn').addEventListener('click', function () { openStudentModal(null); });
+    $('#addStudentBtn2').addEventListener('click', function () { openStudentModal(null); });
+    $('#exportBtn').addEventListener('click', function () {
+      if (downloadCsv(E.buildCsv(state, state.activeSubject, state.activeQuarter),
+        'class-record-' + subjectName(state.activeSubject).replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-' + state.activeQuarter + '.csv'))
+        toast('Class record CSV exported with item counts.');
+    });
+    $('#printBtn').addEventListener('click', function () { window.print(); });
+    $('#printReportBtn').addEventListener('click', function () { window.print(); });
+    $('#exportReportBtn').addEventListener('click', function () {
+      if (downloadCsv(E.buildReportCsv(state), 'report-cards.csv')) toast('All report cards exported.');
+    });
+    $('#randomBtn').addEventListener('click', openRandomModal);
+    $('#randomBtnTop').addEventListener('click', openRandomModal);
+    $('#randAllShortcut').addEventListener('click', function () {
+      $('#randScope').value = 'all'; updateRandomPreview();
+      $('#randScope').focus();
+    });
+    ['#randScope', '#randRange', '#randMode'].forEach(function (id) {
+      $(id).addEventListener('change', updateRandomPreview);
+    });
+    $('#generateRandomBtn').addEventListener('click', function () {
+      var o = randomOptions();
+      closeModal('randomModal');
+      function run() {
+        var n = E.generateRandomGrades(state, o);
+        save(); renderAll();
+        toast(n + ' random grades added — edit any cell any time.');
+      }
+      if (o.onlyBlank) run();
+      else openConfirm('Replace every score?',
+        'All existing scores in the selected class records will be overwritten with new random grades. This cannot be undone.',
+        run, 'Replace scores');
+    });
+    $('#clearBtn').addEventListener('click', function () {
+      openConfirm('Clear scores?', 'All scores for ' + subjectName(state.activeSubject) + ' · ' + quarterLabel(state.activeQuarter) +
+        ' will be erased. Assessments and their item counts stay.',
+        function () { E.clearSheet(state, state.activeSubject, state.activeQuarter); save(); renderAll(); toast('Scores cleared.'); }, 'Clear scores');
+    });
+
+    // Grade entry
+    $('#tableBody').addEventListener('input', function (e) {
+      var inp = e.target.closest ? e.target.closest('input.cell') : null; if (!inp) return;
+      var raw = inp.value.trim(), val = null, items = Number(inp.getAttribute('data-items'));
+      if (raw !== '') {
+        var n = Number(raw);
+        if (!Number.isFinite(n) || n < 0 || n > items) { inp.classList.add('invalid'); inp.setAttribute('aria-invalid', 'true'); return; }
+        val = Math.round(n);
+      }
+      inp.classList.remove('invalid'); inp.removeAttribute('aria-invalid');
+      var key = E.scoreKey(state.activeSubject, state.activeQuarter, inp.getAttribute('data-stu'), inp.getAttribute('data-a'));
+      if (val === null) delete state.scores[key]; else state.scores[key] = val;
+      save(); refreshAfterGrade(inp.closest('tr'));
+    });
+    $('#tableBody').addEventListener('change', function (e) {
+      var inp = e.target.closest ? e.target.closest('input.cell') : null;
+      if (!inp || inp.classList.contains('invalid')) return;
+      var key = E.scoreKey(state.activeSubject, state.activeQuarter, inp.getAttribute('data-stu'), inp.getAttribute('data-a'));
+      var v = state.scores[key];
+      inp.value = (typeof v === 'number') ? v : '';
+    });
+    $('#tableBody').addEventListener('keydown', function (e) {
+      if (!e.target.matches || !e.target.matches('input.cell')) return;
+      if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      var k = e.target.getAttribute('data-a');
+      var cells = $$('#tableBody input.cell').filter(function (c) { return c.getAttribute('data-a') === k; });
+      var idx = cells.indexOf(e.target), next = cells[idx + (e.key === 'ArrowUp' ? -1 : 1)];
+      if (next) { next.focus(); next.select(); }
+    });
+
+    // Row actions
+    function onRowAction(e) {
+      var btn = e.target.closest ? e.target.closest('button[data-action]') : null; if (!btn) return;
+      var id = btn.getAttribute('data-stu'), st = state.students.find(function (s) { return s.id === id; });
+      if (!st) return;
+      var action = btn.getAttribute('data-action');
+      if (action === 'rename') { openQuick('rename-student', id, st.name, st.name); return; }
+      if (action === 'edit') { openStudentModal(id); return; }
+      if (action === 'report') { ui.reportStudent = id; renderReport(); setView('report'); return; }
+      if (action === 'del') {
+        openConfirm('Delete ' + st.name + '?', 'This removes the student and every score they have in all subjects and quarters.',
+          function () { E.removeStudent(state, id); save(); renderAll(); toast('Student removed.'); }, 'Delete student');
+      }
+    }
+    $('#tableBody').addEventListener('click', onRowAction);
+    $('#studentBody').addEventListener('click', onRowAction);
+
+    // Student form
+    $('#studentForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var no = $('#stuNo').value.trim(), name = $('#stuName').value.trim(), section = $('#stuSection').value.trim();
+      if (!no || !name) { toast('Student ID and full name are required.', 'error'); return; }
+      var ok = ui.editingStudent ? E.updateStudent(state, ui.editingStudent, no, name, section) : E.addStudent(state, no, name, section);
+      if (!ok) { toast('Could not save that student.', 'error'); return; }
+      save(); closeModal('studentModal'); renderAll();
+      toast(ui.editingStudent ? 'Student updated.' : 'Student added.'); ui.editingStudent = null;
+    });
+
+    // Quick modal
+    $('#quickForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = $('#quickInput').value.trim(), q = ui.quick, err = $('#quickError');
+      err.hidden = true;
+      if (!v) { err.textContent = 'This cannot be empty.'; err.hidden = false; return; }
+      var ok;
+      if (q.mode === 'add-subject') ok = E.addSubject(state, v);
+      else if (q.mode === 'rename-subject') ok = E.renameSubject(state, q.id, v);
+      else if (q.mode === 'rename-student') ok = E.renameStudent(state, q.id, v);
+      if (!ok) { err.textContent = 'Could not save that name.'; err.hidden = false; return; }
+      save(); closeModal('quickModal'); renderAll();
+      toast(q.mode === 'add-subject' ? 'Subject added.' : 'Name updated.');
+    });
+
+    // Assessments page
+    $('#assessSubject').addEventListener('change', function (e) {
+      state.activeSubject = e.target.value; save(); renderAll();
+    });
+    $('#assessQuarter').addEventListener('change', function (e) { ui.assessQuarter = e.target.value; renderAssessments(); });
+    $('#addAssessmentForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var sh = selectedAssessSheet();
+      var comp = $('#newAssessComp').value;
+      var items = Number($('#newAssessItems').value);
+      var name = $('#newAssessName').value.trim();
+      if (!name) {
+        var n = E.getAssessments(state, sh.sub, sh.q).filter(function (a) { return a.component === comp; }).length + 1;
+        name = compLabel(comp) + ' ' + n;
+      }
+      var a = E.addAssessment(state, sh.sub, sh.q, comp, name, items);
+      if (!a) { toast('Enter a valid number of items (1–1000).', 'error'); return; }
+      $('#newAssessName').value = ''; $('#newAssessItems').value = '';
+      save(); renderAll(); toast(a.name + ' added with ' + a.items + ' items.');
+    });
+    $('#assessmentTable').addEventListener('click', function (e) {
+      var t = e.target, sh = selectedAssessSheet();
+      var ed = t.closest ? t.closest('[data-edit-assess]') : null;
+      if (ed) { openAssessmentModal(ed.getAttribute('data-edit-assess')); return; }
+      var del = t.closest ? t.closest('[data-del-assess]') : null;
+      if (del) {
+        var id = del.getAttribute('data-del-assess');
+        var a = E.getAssessments(state, sh.sub, sh.q).find(function (x) { return x.id === id; });
+        if (!a) return;
+        openConfirm('Delete ' + a.name + '?', 'The assessment and all scores recorded for it will be removed.',
+          function () { E.removeAssessment(state, sh.sub, sh.q, id); save(); renderAll(); toast('Assessment deleted.'); }, 'Delete assessment');
+      }
+    });
+    $('#quarterOverview').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-assess-q]') : null; if (!b) return;
+      ui.assessQuarter = b.getAttribute('data-assess-q'); renderAssessments();
+    });
+    $('#copyQuarterBtn').addEventListener('click', function () {
+      var sh = selectedAssessSheet();
+      if (!E.getAssessments(state, sh.sub, sh.q).length) { toast('Add assessments to this quarter first.', 'error'); return; }
+      openConfirm('Copy to all 4 quarters?', 'The assessment names and item counts from ' + quarterLabel(sh.q) +
+        ' will be copied to the other 3 quarters of ' + subjectName(sh.sub) + '. Existing scores in those quarters will be cleared.',
+        function () { var n = E.copyAssessments(state, sh.sub, sh.q); save(); renderAll(); toast('Copied to ' + n + ' quarters.'); }, 'Copy assessments');
+    });
+    $('#assessmentEditForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var sh = selectedAssessSheet(), err = $('#assessmentEditError');
+      var name = $('#editAssessName').value.trim(), items = Number($('#editAssessItems').value);
+      var a = E.updateAssessment(state, sh.sub, sh.q, ui.editingAssessment, name, items);
+      if (!a) { err.textContent = 'Enter a name and 1–1000 items.'; err.hidden = false; return; }
+      a.component = $('#editAssessComp').value;
+      err.hidden = true; save(); closeModal('assessmentModal'); renderAll(); toast('Assessment updated.');
+    });
+
+    // Report card
+    $('#reportStudent').addEventListener('change', function (e) { ui.reportStudent = e.target.value; renderReport(); });
+
+    // Manage-subjects modal
+    $('#addSubjectBtn').addEventListener('click', function () {
+      var s = E.addSubject(state, $('#newSubjectName').value);
+      if (!s) { toast('Type a subject name first.', 'error'); return; }
+      $('#newSubjectName').value = ''; save(); renderSubjectList(); renderAll(); toast('Subject added.');
+    });
+    $('#subjectList').addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('[data-del-sub]') : null; if (!btn) return;
+      var id = btn.getAttribute('data-del-sub');
+      if (state.subjects.length <= 1) { toast('Keep at least one subject.', 'error'); return; }
+      openConfirm('Delete ' + subjectName(id) + '?', 'The subject and all of its grades in every quarter will be removed.',
+        function () { E.removeSubject(state, id); save(); renderSubjectList(); renderAll(); toast('Subject removed.'); }, 'Delete subject');
+    });
+    $('#saveSubjectsBtn').addEventListener('click', function () {
+      var inputs = $$('#subjectList .subject-name');
+      if (inputs.some(function (i) { return !i.value.trim(); })) { toast('Every subject needs a name.', 'error'); return; }
+      inputs.forEach(function (i) { E.renameSubject(state, i.getAttribute('data-sub-id'), i.value); });
+      save(); closeModal('subjectModal'); renderAll(); toast('Subject names saved.');
+    });
+
+    // Modal plumbing
+    $('#confirmOk').addEventListener('click', function () { var fn = ui.confirmFn; closeModal('confirmModal'); if (fn) fn(); });
+    document.addEventListener('click', function (e) {
+      var closer = e.target.closest ? e.target.closest('[data-close]') : null;
+      if (closer) { closeModal(closer.getAttribute('data-close')); return; }
+      if (e.target.classList && e.target.classList.contains('modal-backdrop')) closeModal(e.target.id);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      ['studentModal', 'subjectModal', 'quickModal', 'assessmentModal', 'randomModal', 'settingsModal', 'confirmModal'].forEach(function (id) {
+        if (!$('#' + id).hidden) closeModal(id);
+      });
+    });
+    window.addEventListener('pagehide', function () {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (err) { /* ignore */ }
+    });
+    window.addEventListener('resize', syncStickyOffset);
+    window.addEventListener('scroll', function () {
+      var y = window.scrollY || document.documentElement.scrollTop || 0;
+      $('#toTop').hidden = y < 420;
+    });
+    $('#toTop').addEventListener('click', function () {
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (err) { /* ignore */ }
+    });
+    $('#year').textContent = new Date().getFullYear();
+  }
+
+  // ---------------------------------------------------------------------- boot
+  loadState(); normalizeWholeScores(); seedSampleGrades(); loadAuth(); bind(); renderAll();
+  syncStickyOffset();
+  if (isAuthed()) enterApp(); else showAuth();
+  if (!storageOK) { $('#storageWarning').hidden = false; $('#saveStatus').classList.add('error'); }
+})();
+
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5751b164bfa5547',t:'MTc5NDE0NjQ0NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5751b164bfa5547',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
